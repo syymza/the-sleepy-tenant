@@ -13,14 +13,19 @@
     if(message)announcement.textContent=message;
   });
   soundButton.addEventListener('click',()=>sound.enabled?sound.disable():sound.enable());
-  const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  let reduced = motion.matches, paused = false, w = 0, h = 0, scale = 1, ox = 0, oy = 0, boundX = 105;
-  let now = 0, previous = 0, idle = 0, frightenedUntil = 0, releasedAt = -10;
-  let active = null, lastPointer = null, lastInputTime = 0;
-  const keys = new Set();
-  const state = {x:0,y:0,tx:0,ty:0,lean:0,reveal:.72,expression:'sleepy',speed:0};
-  const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
-  const mix = (a,b,t) => a+(b-a)*t;
+  const motion=matchMedia('(prefers-reduced-motion: reduce)');
+  let reduced=motion.matches,paused=false,w=0,h=0,scale=1,ox=0,oy=0;
+  let now=0,previous=0,idle=0,frightenedUntil=0,pettedUntil=0,peekUntil=0,releasedAt=-10;
+  let active=null,keyboardHeld=false,selected='mug',focused=null,hover=null,strokeLean=0;
+  const keys=new Set();
+  const tray={x:0,y:0,tx:0,ty:0};
+  const mug={x:0,y:0,tx:0,ty:0,lift:0,tilt:0,seated:true,landing:null};
+  const state={lean:0,reveal:.72,expression:'sleepy'};
+  const limits={tray:{},mug:{}};
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const mix=(a,b,t)=>a+(b-a)*t;
+  const hint=document.querySelector('#hint');
+  const objectControls=[...document.querySelectorAll('.object-control')];
   const noise = document.createElement('canvas'); noise.width=256;noise.height=256;
   const nc = noise.getContext('2d'), pixels = nc.createImageData(256,256);
   let seed = 7527;
@@ -32,6 +37,10 @@
   function gradient(x,y,x2,y2,stops){const g=ctx.createLinearGradient(x,y,x2,y2);stops.forEach(s=>g.addColorStop(...s));return g;}
   function grain(p,alpha=.18){ctx.save();if(p)ctx.clip(p);ctx.globalAlpha=alpha;ctx.fillStyle=texture;ctx.fillRect(-300,-350,600,650);ctx.restore();}
   function shadow(x,y,rx,ry,opacity){ctx.save();ctx.translate(x,y);ctx.scale(1,ry/rx);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,`rgba(65,51,33,${opacity})`);g.addColorStop(1,'rgba(65,51,33,0)');ellipse(0,0,rx,rx,g);ctx.restore();}
+  const hitCtx=document.createElement('canvas').getContext('2d');
+  const mugHandle=new Path2D('M105 -22 C181 -45 199 42 165 90 C151 110 132 116 111 106 L104 84 C147 104 165 59 157 24 C151 2 136 -5 109 9 Z');
+  const mugBody=new Path2D('M-116 -22 C-113 24 -112 102 -84 132 C-55 160 55 160 84 132 C112 102 113 24 116 -22');
+  mugBody.ellipse(0,-22,116,36,0,0,Math.PI);mugBody.closePath();
   function saucer(){
     shadow(6,172,240,41,.16);shadow(0,163,174,20,.14);
     ellipse(0,157,188,47,'#a7aa8d');
@@ -39,7 +48,7 @@
     ctx.save();ctx.beginPath();ctx.ellipse(0,150,187,44,0,0,Math.PI*2);ctx.clip();grain(null,.35);ctx.restore();
     ctx.beginPath();ctx.ellipse(0,148,176,38,0,.12,Math.PI-.12);ctx.strokeStyle='#e2e1cb';ctx.lineWidth=2;ctx.stroke();
     ellipse(0,150,127,27,'#aeb69a');ellipse(0,148,125,25,'#c1c5aa');
-    shadow(-3,151,119,24,.25);
+
     // A little fallen sprig, painted with the same restrained material palette.
     ctx.save();ctx.translate(-143,151);ctx.rotate(-.28);
     path('M-13 4 Q1 -2 24 -4',null,'#858b68',1.5);
@@ -48,7 +57,7 @@
   }
   function cupBack(t){
     // The handle has real negative space instead of a painted-on inner patch.
-    const handle=new Path2D('M105 -22 C181 -45 199 42 165 90 C151 110 132 116 111 106 L104 84 C147 104 165 59 157 24 C151 2 136 -5 109 9 Z');
+    const handle=mugHandle;
     ctx.save();ctx.shadowColor='#79604c35';ctx.shadowBlur=5;ctx.shadowOffsetY=4;
     ctx.fillStyle=gradient(100,-20,180,95,[[0,'#c9a78b'],[.4,'#b88b70'],[1,'#8e6554']]);ctx.fill(handle);ctx.restore();grain(handle,.7);
     path('M125 -14 C170 -17 181 68 135 96',null,'#d7b89a',2.4);
@@ -92,12 +101,12 @@
     path('M-11 -49 Q-16 -57 -8 -53 Q-2 -61 3 -52 Q10 -57 12 -49','#ebddbd');
     const muzzle=ctx.createRadialGradient(0,19,2,0,19,30);muzzle.addColorStop(0,'#f4e9d1');muzzle.addColorStop(1,'#eee1c100');
     ellipse(0,19,31,24,muzzle);
-    for(const x of [-36,36]){const blush=ctx.createRadialGradient(x,12,1,x,12,12);blush.addColorStop(0,'#dcae9766');blush.addColorStop(1,'#dcae9700');ellipse(x,12,12,8,blush);}
+    for(const x of [-36,36]){const blush=ctx.createRadialGradient(x,12,1,x,12,12);blush.addColorStop(0,state.expression==='petted'?'#dca58a99':'#dcae9766');blush.addColorStop(1,'#dcae9700');ellipse(x,12,12,8,blush);}
     const blink=(!reduced && (t%5.7<.16 || state.expression==='sleepy' && t%5.7<2.5));
     ctx.lineCap='round';ctx.lineWidth=2.8;ctx.strokeStyle='#4b4739';
     const gaze=clamp(lean*2,-2,2);
     for(const ex of [-22,22]){
-      if(blink || state.expression==='nesting' || state.expression==='content')path(`M${ex-5.5} -4 Q${ex} 1 ${ex+5.5} -4`,null,'#62523f',2.5);
+      if(blink || state.expression==='nesting' || state.expression==='content' || state.expression==='petted')path(`M${ex-5.5} -4 Q${ex} 1 ${ex+5.5} -4`,null,'#62523f',2.5);
       else {ellipse(ex+gaze,-5,4.7,state.expression==='startled'?6.6:5.8,'#4c4435');ellipse(ex+gaze-1.2,-7,1.35,1.5,'#fff5db');}
     }
     path('M-4 10 Q0 7 4 10 Q4 13 0 14 Q-4 13 -4 10','#94745d');
@@ -105,8 +114,7 @@
     ctx.restore();
   }
   function cupFront(){
-    const body=new Path2D('M-116 -22 C-113 24 -112 102 -84 132 C-55 160 55 160 84 132 C112 102 113 24 116 -22');
-    body.ellipse(0,-22,116,36,0,0,Math.PI);body.closePath();
+    const body=mugBody;
     ctx.fillStyle=gradient(-115,0,120,30,[[0,'#a4775e'],[.16,'#c49a7a'],[.40,'#d9b795'],[.68,'#c69a7b'],[1,'#94654f']]);ctx.fill(body);
     grain(body,.56);
     ctx.save();ctx.clip(body);
@@ -134,81 +142,207 @@
       ctx.restore();
     }
   }
-  const descriptions={sleepy:'a very small someone, almost awake',curious:'oh. is that you?',startled:'a little slower, perhaps',content:'yes. this is a good place.',peeking:'just checking on the world',nesting:'one more tuck, then a little rest'};
+  const descriptions={sleepy:'a small home. a very sleepy tenant.',curious:'a little look around',startled:'oh! back under the quilt.',content:'there. all tucked in.',petted:'that is a very good spot.',peeking:'just checking on the world',nesting:'one more tuck, then a little rest'};
   function setExpression(value){if(value===state.expression)return;state.expression=value;mood.textContent=descriptions[value];announcement.textContent=descriptions[value];sound.react(value);}
-  function animate(ms){
-    const raw=ms/1000,dt=Math.min((raw-previous)||.016,.04);previous=raw;
-    if(!paused && !document.hidden){
-      now+=dt;
-      idle+=dt;
-      if(keys.size){let dx=(keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0),dy=(keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0);state.tx=clamp(state.tx+dx*dt*42,-boundX,boundX);state.ty=clamp(state.ty+dy*dt*27,-27,27);idle=0;}
-      state.speed*=Math.exp(-dt*8);
-      const moving=active!==null||keys.size>0;
-      let expression, target;
-      if(now<frightenedUntil){expression='startled';target=0;}
-      else if(moving){expression='curious';target=1;}
-      else if(now-releasedAt<3){expression='content';target=.9;}
-      else if(idle%20>12&&idle%20<16){expression='nesting';target=.34;}
-      else if(idle%20>6){expression='peeking';target=.88;}
-      else{expression='sleepy';target=.72;}
-      setExpression(expression);
-      const smoothing=1-Math.exp(-dt*(reduced?15:8));
-      const oldX=state.x,oldY=state.y;
-      state.x=mix(state.x,state.tx,smoothing);state.y=mix(state.y,state.ty,smoothing);
-      sound.motion(Math.hypot(state.x-oldX,state.y-oldY)/dt);
-      state.reveal=mix(state.reveal,target,1-Math.exp(-dt*(expression==='startled'?13:2.8)));
-      const nest=expression==='nesting'&&!reduced?Math.sin(now*3)*.24:0;
-      state.lean=mix(state.lean,clamp((state.tx-state.x)*-.035+state.tx/250+nest,-.65,.65),smoothing);
+  function liftHeight(){return Math.min(34,26/scale);}
+  function fit(kind,x,y){const b=limits[kind];return{x:clamp(x,b.minX,b.maxX),y:clamp(y,b.minY,b.maxY)};}
+  function overlaps(x,y,tx=tray.tx,ty=tray.ty){return ((x-tx)/272)**2+((y-ty)/72)**2<1;}
+  function moveTray(x,y){
+    let p=fit('tray',x,y);
+    if(!mug.seated && !mug.landing?.seat && overlaps(mug.x,mug.y,p.x,p.y)){
+      let dx=p.x-mug.x,dy=p.y-mug.y,n=Math.hypot(dx/272,dy/72);
+      if(n<.01){dx=tray.x-mug.x;dy=tray.y-mug.y;n=Math.hypot(dx/272,dy/72)||1;}
+      p=fit('tray',mug.x+dx/n,mug.y+dy/n);
+      if(overlaps(mug.x,mug.y,p.x,p.y))return;
     }
-    draw(paused?lastInputTime:now);
-    requestAnimationFrame(animate);
+    tray.tx=p.x;tray.ty=p.y;
   }
-  function draw(t){
-    ctx.setTransform(devicePixelRatio>2?2:devicePixelRatio,0,0,devicePixelRatio>2?2:devicePixelRatio,0,0);ctx.clearRect(0,0,w,h);
-    ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
-    // Grounded ambient shadow belongs to the room, contact shadows to the saucer.
-    shadow(15,175,269,47,.08);
-    ctx.translate(state.x,state.y);
-    saucer();
-    ctx.save();ctx.rotate(reduced?0:state.lean*.018);cupBack(t);
-    ctx.save();ctx.clip(new Path2D('M-103 -250 L103 -250 L103 -24 C103 12 -103 12 -103 -24 Z'));
-    creature(t);ctx.restore();cupFront();paws(t);ctx.restore();
-    ctx.restore();
+  function landMug(cancelled=false){
+    const p=fit('mug',cancelled?mug.x:mug.tx,cancelled?mug.y:mug.ty);
+    const seat=overlaps(p.x,p.y);
+    mug.tx=seat?tray.tx:p.x;mug.ty=seat?tray.ty:p.y;
+    mug.landing={seat};keyboardHeld=false;
+    releasedAt=now;idle=0;
   }
-  function resize(){
-    const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
-    scale=Math.min(w/510,h/450,1.35);ox=w/2;oy=h*.5-20*scale;
-    boundX=Math.max(0,Math.min(105,(w/scale-400)/2-12));
-    state.tx=clamp(state.tx,-boundX,boundX);state.x=clamp(state.x,-boundX,boundX);
+  function mugPoint(point){
+    const dx=point.x-mug.x,dy=point.y-(mug.y-mug.lift)-153,c=Math.cos(mug.tilt),s=Math.sin(mug.tilt);
+    return{x:dx*c+dy*s,y:-dx*s+dy*c+153};
   }
-  function point(e){const b=canvas.getBoundingClientRect();return {x:(e.clientX-b.left-ox)/scale,y:(e.clientY-b.top-oy)/scale};}
+  function petHit(p,slop){
+    if(Math.abs(p.x)>103)return false;
+    const front=-24+27*Math.sqrt(Math.max(0,1-(p.x/104)**2));
+    if(p.y>front-1)return false;
+    const head=pose(now),dx=p.x-head.x,dy=p.y-head.y,c=Math.cos(head.angle),s=Math.sin(head.angle),x=dx*c+dy*s,y=-dx*s+dy*c;
+    return (x/(62+slop))**2+((y+4)/(49+slop))**2<1 || ((x+47)/(17+slop))**2+((y+59)/(24+slop))**2<1 || ((x-47)/(17+slop))**2+((y+59)/(24+slop))**2<1;
+  }
+  function hit(point,pointerType='mouse'){
+    const p=mugPoint(point),slop=pointerType==='touch'?6/scale:0;
+    const onTray=((point.x-tray.x)/(190+slop))**2+((point.y-tray.y-151)/(47+slop))**2<1;
+    const trayInFront=!mug.seated&&!mug.landing&&mug.lift<1&&mug.y<tray.y-30;
+    if(trayInFront&&onTray)return 'tray';
+    if(petHit(p,slop*.35))return 'pet';
+    hitCtx.lineWidth=slop*2;
+    if(hitCtx.isPointInPath(mugBody,p.x,p.y)||hitCtx.isPointInPath(mugHandle,p.x,p.y)||(slop>0&&(hitCtx.isPointInStroke(mugBody,p.x,p.y)||hitCtx.isPointInStroke(mugHandle,p.x,p.y))))return 'mug';
+    return onTray?'tray':null;
+  }
+  function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left-ox)/scale,y:(e.clientY-r.top-oy)/scale};}
+  function updateCursor(){canvas.style.cursor=paused?'default':active?(active.kind==='pet'?'pointer':'grabbing'):hover==='pet'?'pointer':hover?'grab':'default';}
+  function releaseCapture(id){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
+  function finishGesture(cancelled=false){
+    if(!active)return;
+    const gesture=active;active=null;releaseCapture(gesture.id);
+    if(gesture.kind==='mug'&&(gesture.dragged||gesture.wasSettling))landMug(cancelled);
+    else if(gesture.kind==='pet'){
+      if(!cancelled&&!gesture.stroked&&now-gesture.time<.3&&gesture.travel<12)frightenedUntil=now+1.5;
+      else if(gesture.stroked||(!cancelled&&!gesture.poked))pettedUntil=now+2.6;
+    }else if(!cancelled){peekUntil=now+.8;releasedAt=now;}
+    hover=null;updateCursor();
+  }
+  function cancel(){finishGesture(true);keys.clear();if(keyboardHeld)landMug(true);keyboardHeld=false;}
+  function reset(){cancel();tray.tx=0;tray.ty=0;mug.tx=0;mug.ty=0;mug.landing={seat:true};releasedAt=now;}
+  function keyboard(e,kind=selected){
+    if(e.code==='Space'){e.preventDefault();if(!e.repeat)togglePause();return;}
+    if(paused)return;
+    sound.unlock();selected=kind;
+    if(e.key==='Escape'){e.preventDefault();cancel();return;}
+    if(e.key==='Home'){e.preventDefault();reset();return;}
+    if(e.key.startsWith('Arrow')&&kind!=='pet'){
+      e.preventDefault();keys.add(e.key);
+      if(kind==='mug'&&!keyboardHeld){mug.seated=false;mug.landing=null;keyboardHeld=true;}
+    }
+    if(e.key==='Enter'&&!e.repeat){
+      e.preventDefault();
+      if(kind==='pet'){if(e.shiftKey)frightenedUntil=now+1.5;else pettedUntil=now+2.8;}
+      else if(kind==='mug'){if(keyboardHeld)landMug();else{mug.seated=false;mug.landing=null;keyboardHeld=true;}}
+      else peekUntil=now+1;
+      idle=0;
+    }
+  }
   canvas.addEventListener('pointerdown',e=>{
-    if(paused||active!==null||e.button!==0)return;const p=point(e);
-    if(Math.abs(p.x-state.x)>211||p.y-state.y<109||p.y-state.y>211)return;
-    sound.unlock();canvas.classList.add('pointer-focus');active=e.pointerId;lastPointer={...p,t:e.timeStamp};canvas.setPointerCapture(active);canvas.focus({preventScroll:true});idle=0;
+    if(paused||active||e.button!==0)return;
+    const p=point(e),kind=hit(p,e.pointerType);if(!kind)return;
+    e.preventDefault();if(keyboardHeld)landMug();sound.unlock();focused=null;selected=kind;canvas.focus({preventScroll:true});
+    const wasSettling=kind==='mug'&&!!mug.landing,heldLift=wasSettling?mug.lift:0;
+    if(wasSettling){mug.tx=mug.x;mug.ty=mug.y;mug.landing=null;mug.seated=false;}
+    active={id:e.pointerId,kind,start:p,last:p,startScreen:{x:e.clientX,y:e.clientY},lastScreen:{x:e.clientX,y:e.clientY},stamp:e.timeStamp,time:now,travel:0,dragged:false,stroked:false,wasSettling,heldLift,startObject:{x:kind==='tray'?tray.tx:mug.x,y:kind==='tray'?tray.ty:mug.y}};
+    canvas.setPointerCapture(e.pointerId);idle=0;updateCursor();
   });
   canvas.addEventListener('pointermove',e=>{
-    if(active!==e.pointerId)return;e.preventDefault();const p=point(e), elapsed=Math.max((e.timeStamp-lastPointer.t)/1000,.008);
-    const dx=p.x-lastPointer.x,dy=p.y-lastPointer.y, speed=Math.hypot(dx,dy)/elapsed;
-    state.tx=clamp(state.tx+dx,-boundX,boundX);state.ty=clamp(state.ty+dy*.65,-27,27);
-    if(speed>650&&Math.hypot(dx,dy)>10){frightenedUntil=now+2.6;state.speed=speed;}
-    lastPointer={...p,t:e.timeStamp};idle=0;
+    const p=point(e);
+    if(!active){hover=hit(p,e.pointerType);updateCursor();return;}
+    if(active.id!==e.pointerId)return;e.preventDefault();
+    const a=active,dx=e.clientX-a.lastScreen.x,dy=e.clientY-a.lastScreen.y,delta=Math.hypot(dx,dy),dt=Math.max((e.timeStamp-a.stamp)/1000,.008),speed=delta/dt;
+    a.travel+=delta;
+    if(a.kind==='pet'){
+      if(speed>800&&delta>7){a.poked=true;frightenedUntil=now+1.5;}
+      else if(now-a.time>.14&&a.travel>8&&speed<500){a.stroked=true;pettedUntil=now+2.6;strokeLean=clamp(dx*.025,-.3,.3);}
+    }else{
+      if(!a.dragged&&Math.hypot(e.clientX-a.startScreen.x,e.clientY-a.startScreen.y)>6){a.dragged=true;if(a.kind==='mug'){mug.seated=false;mug.landing=null;}}
+      if(a.dragged){
+        const x=a.startObject.x+p.x-a.start.x,y=a.startObject.y+p.y-a.start.y;
+        if(a.kind==='mug'){const target=fit('mug',x,y);mug.tx=target.x;mug.ty=target.y;}
+        else moveTray(x,y);
+      }
+    }
+    a.last=p;a.lastScreen={x:e.clientX,y:e.clientY};a.stamp=e.timeStamp;idle=0;
   });
-  function release(e){if(e.pointerId!==active)return;active=null;lastPointer=null;releasedAt=now;idle=0;}
-  canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);
-  canvas.addEventListener('keydown',e=>{
-    sound.unlock();
-    canvas.classList.remove('pointer-focus');
-    if(e.key.startsWith('Arrow')){e.preventDefault();if(!paused)keys.add(e.key);}
-    if(e.code==='Space'){e.preventDefault();if(!e.repeat)togglePause();}
-    if(e.key==='Home'){e.preventDefault();state.tx=state.ty=0;idle=0;releasedAt=now;}
-  });
+  canvas.addEventListener('pointerup',e=>{if(active?.id===e.pointerId)finishGesture();});
+  canvas.addEventListener('pointercancel',e=>{if(active?.id===e.pointerId)finishGesture(true);});
+  canvas.addEventListener('lostpointercapture',e=>{if(active?.id===e.pointerId)finishGesture(true);});
+  canvas.addEventListener('pointerleave',()=>{if(!active){hover=null;updateCursor();}});
+  canvas.addEventListener('keydown',e=>keyboard(e));
   window.addEventListener('keyup',e=>keys.delete(e.key));
-  function cancel(){keys.clear();if(active!==null){const id=active;active=null;lastPointer=null;if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}}
+  for(const control of objectControls){
+    const kind=control.dataset.object;
+    control.addEventListener('focus',()=>{if(keyboardHeld&&selected!==kind)landMug();selected=kind;focused=kind;peekUntil=now+.7;hint.textContent=kind==='pet'?'Enter for a gentle stroke. Shift + Enter for a quick poke.':kind==='mug'?'Enter to lift. Arrows to move. Enter to place.':'Arrow keys slide the saucer. Home brings everyone back.';});
+    control.addEventListener('blur',()=>{focused=null;keys.clear();hint.textContent='Lift the cup. Stroke a sleepy head.';});
+    control.addEventListener('keydown',e=>keyboard(e,kind));
+    control.addEventListener('click',e=>{if(e.detail===0){keyboard({code:'',key:'Enter',repeat:false,shiftKey:false,preventDefault(){}},kind);}});
+  }
+  function togglePause(){paused=!paused;cancel();sound.setBlocked(paused||document.hidden);if(!paused)sound.unlock();pauseButton.textContent=paused?'Resume':'Pause';pauseButton.setAttribute('aria-pressed',String(paused));announcement.textContent=paused?'The scene is paused.':'The scene is playing.';updateCursor();draw(now);}
+  pauseButton.addEventListener('click',togglePause);
   window.addEventListener('blur',()=>{cancel();sound.setBlocked(true);});
   window.addEventListener('focus',()=>sound.setBlocked(paused||document.hidden));
   document.addEventListener('visibilitychange',()=>{cancel();sound.setBlocked(paused||document.hidden);});
-  function togglePause(){paused=!paused;lastInputTime=now;cancel();sound.setBlocked(paused||document.hidden);if(!paused)sound.unlock();pauseButton.textContent=paused?'Resume':'Pause';pauseButton.setAttribute('aria-pressed',String(paused));announcement.textContent=paused?'The scene is paused.':'The scene is playing.';}
-  pauseButton.addEventListener('click',togglePause);
-  motion.addEventListener('change',e=>{reduced=e.matches;});window.addEventListener('resize',resize);resize();requestAnimationFrame(animate);
+  motion.addEventListener('change',e=>{reduced=e.matches;});
+  function animate(ms){
+    const raw=ms/1000,dt=Math.min((raw-previous)||.016,.035);previous=raw;
+    if(!paused&&!document.hidden){
+      now+=dt;idle+=dt;
+      const oldCupX=mug.x,oldCupY=mug.y,oldTrayX=tray.x,oldTrayY=tray.y;
+      if(keys.size){
+        const dx=(keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0),dy=(keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0);
+        if(selected==='mug'){const p=fit('mug',mug.tx+dx*dt*95,mug.ty+dy*dt*70);mug.tx=p.x;mug.ty=p.y;}
+        else if(selected==='tray')moveTray(tray.tx+dx*dt*85,tray.ty+dy*dt*55);
+        idle=0;
+      }
+      const follow=1-Math.exp(-dt*15),settle=1-Math.exp(-dt*11);
+      tray.x=mix(tray.x,tray.tx,follow);tray.y=mix(tray.y,tray.ty,follow);
+      if(mug.seated){mug.x=tray.x;mug.y=tray.y;mug.tx=tray.tx;mug.ty=tray.ty;}
+      else{
+        if(mug.landing?.seat){mug.tx=tray.x;mug.ty=tray.y;}
+        mug.x=mix(mug.x,mug.tx,mug.landing?settle:follow);mug.y=mix(mug.y,mug.ty,mug.landing?settle:follow);
+      }
+      let targetLift=(active?.kind==='mug'&&active.dragged)||keyboardHeld?liftHeight():0;
+      if(active?.kind==='mug'&&!active.dragged&&active.wasSettling)targetLift=active.heldLift;
+      if(mug.landing?.seat&&Math.hypot(mug.tx-mug.x,mug.ty-mug.y)>7)targetLift=liftHeight();
+      mug.lift=mix(mug.lift,targetLift,1-Math.exp(-dt*(targetLift?13:10)));
+      if(mug.landing&&Math.hypot(mug.tx-mug.x,mug.ty-mug.y)<.6&&mug.lift<.3){mug.x=mug.tx;mug.y=mug.ty;mug.lift=0;mug.seated=mug.landing.seat;mug.landing=null;releasedAt=now;sound.place?.();}
+      const vx=(mug.x-oldCupX)/dt,vy=(mug.y-oldCupY)/dt,traySpeed=Math.hypot(tray.x-oldTrayX,tray.y-oldTrayY)/dt;
+      sound.motion(Math.max(traySpeed,mug.lift<1&&!mug.seated?Math.hypot(vx,vy):0));
+      if(Math.hypot(vx,vy)>650&&((active?.dragged&&active.kind!=='pet')||keyboardHeld))frightenedUntil=now+1.6;
+      mug.tilt=mix(mug.tilt,reduced?0:clamp(-vx*.00015,-.045,.045),1-Math.exp(-dt*9));
+      if(active?.kind==='pet'&&now-active.time>.38&&!active.stroked&&now>frightenedUntil){active.stroked=true;pettedUntil=now+2.6;}
+      let expression,target;
+      if(now<frightenedUntil){expression='startled';target=0;}
+      else if(now<pettedUntil){expression='petted';target=.93;}
+      else if((active&&active.kind!=='pet'&&active.dragged)||keyboardHeld||now<peekUntil){expression='curious';target=1;}
+      else if(mug.landing||now-releasedAt<2.4){expression='content';target=.9;}
+      else if(idle%20>12&&idle%20<16){expression='nesting';target=.34;}
+      else if(idle%20>6){expression='peeking';target=.88;}
+      else{expression='sleepy';target=.72;}
+      setExpression(expression);state.reveal=mix(state.reveal,target,1-Math.exp(-dt*(expression==='startled'?15:3.5)));
+      strokeLean*=Math.exp(-dt*.8);
+      const nest=expression==='nesting'&&!reduced?Math.sin(now*3)*.18:0;
+      state.lean=mix(state.lean,clamp(-vx/340+(expression==='petted'?strokeLean:0)+nest,-.7,.7),1-Math.exp(-dt*8));
+      for(const control of objectControls)control.setAttribute('aria-pressed',String(control.dataset.object==='mug'&&keyboardHeld));
+    }
+    draw(now);requestAnimationFrame(animate);
+  }
+  function focusOutline(kind){
+    if(focused!==kind)return;ctx.save();ctx.strokeStyle='#737b56';ctx.lineWidth=1.4;ctx.setLineDash([4,5]);
+    if(kind==='tray'){ctx.beginPath();ctx.ellipse(0,151,198,53,0,0,Math.PI*2);ctx.stroke();}
+    if(kind==='mug'){ctx.stroke(mugBody);ctx.stroke(mugHandle);}
+    if(kind==='pet'){const p=pose(now);ctx.beginPath();ctx.ellipse(p.x,p.y-4,66,51,p.angle,0,Math.PI*2);ctx.stroke();}
+    ctx.restore();
+  }
+  function drawTray(){ctx.save();ctx.translate(tray.x,tray.y);saucer();if((active?.kind==='mug'&&active.dragged)||keyboardHeld){if(overlaps(mug.tx,mug.ty)){ctx.beginPath();ctx.ellipse(0,148,91,18,0,0,Math.PI*2);ctx.strokeStyle='#e6e2caaa';ctx.lineWidth=2;ctx.stroke();}}focusOutline('tray');ctx.restore();}
+  function drawMug(t){
+    const spread=mug.lift*.55;shadow(mug.x,mug.y+153,110+spread,19+mug.lift*.12,.23/(1+mug.lift*.025));
+    shadow(mug.x,mug.y+153,82,7,.25*Math.max(0,1-mug.lift/10));
+    ctx.save();ctx.translate(mug.x,mug.y-mug.lift+153);ctx.rotate(mug.tilt);ctx.translate(0,-153);
+    cupBack(t);ctx.save();ctx.clip(new Path2D('M-103 -250 L103 -250 L103 -24 C103 12 -103 12 -103 -24 Z'));creature(t);ctx.restore();cupFront();paws(t);focusOutline('mug');focusOutline('pet');
+    if(hover==='mug'&&!active){ctx.beginPath();ctx.ellipse(0,-22,116,36,0,0,Math.PI*2);ctx.strokeStyle='#f4dcc170';ctx.lineWidth=1;ctx.stroke();}
+    ctx.restore();
+  }
+  function draw(t){
+    const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+    const trayInFront=!mug.seated&&!mug.landing&&mug.lift<1&&mug.y<tray.y-30;
+    if(trayInFront){drawMug(t);drawTray();}else{drawTray();drawMug(t);}ctx.restore();
+  }
+  function resize(){
+    cancel();const r=canvas.getBoundingClientRect();w=r.width;h=r.height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
+    const roomy=w>=900&&innerHeight>=600;scale=Math.min(w/510,h/470,1.35);ox=w/2;oy=h*.5-(roomy?25:20)*scale;
+    const pad=16/scale,half=w/(2*scale),top=-oy/scale,bottom=(h-oy)/scale;
+    limits.tray={minX:Math.min(0,-half+pad+198),maxX:Math.max(0,half-pad-198),minY:Math.min(0,top+pad+137),maxY:Math.max(0,bottom-pad-210)};
+    limits.mug={minX:Math.min(0,-half+pad+132),maxX:Math.max(0,half-pad-198),minY:Math.min(0,top+pad+137+liftHeight()),maxY:Math.max(0,bottom-pad-165)};
+    for(const [kind,object]of [['tray',tray],['mug',mug]]){const p=fit(kind,object.x,object.y),target=fit(kind,object.tx,object.ty);object.x=p.x;object.y=p.y;object.tx=target.x;object.ty=target.y;}
+    if(mug.seated){mug.x=tray.x;mug.y=tray.y;mug.tx=tray.tx;mug.ty=tray.ty;}
+    else if(!mug.landing&&overlaps(mug.tx,mug.ty))landMug(true);
+    hover=null;updateCursor();
+  }
+  window.addEventListener('resize',resize);resize();requestAnimationFrame(animate);
+  // Read-only scene diagnostics are opt-in for browser verification.
+  if(new URLSearchParams(location.search).has('inspect'))globalThis.SleepyTenantPreview=Object.freeze({getState:()=>({mug:{...mug,landing:mug.landing?{...mug.landing}:null},saucer:{...tray},pet:{...state},active:active?{kind:active.kind,dragged:active.dragged}:null,keyboardHeld,paused,camera:{w,h,scale,ox,oy},limits:JSON.parse(JSON.stringify(limits)),cursor:canvas.style.cursor})});
+
 })();

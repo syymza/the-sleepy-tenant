@@ -11,9 +11,12 @@
 <body>
   <header><p class="eyebrow">A LITTLE MOMENT OF QUIET</p><h1>The Sleepy Tenant</h1><p class="intro">Someone small has made themselves at home.</p></header>
   <main>
-    <canvas id="scene" tabindex="0" role="application" aria-label="The Sleepy Tenant. Drag the saucer gently to meet its tenant. Quick movement makes them hide. Use arrow keys to move, Space to pause and Home to settle the saucer." aria-describedby="hint"></canvas>
+    <canvas id="scene" tabindex="-1" role="img" aria-label="A sleepy tenant lives in a ceramic cup on a saucer." aria-describedby="hint"></canvas>
+    <button class="object-control" data-object="mug" type="button" aria-label="Mug. Enter to lift or place. Arrow keys to move." aria-pressed="false">Mug</button>
+    <button class="object-control" data-object="tray" type="button" aria-label="Saucer. Arrow keys to slide." aria-pressed="false">Saucer</button>
+    <button class="object-control" data-object="pet" type="button" aria-label="Sleepy tenant. Enter for a gentle stroke. Shift Enter for a quick poke." aria-pressed="false">Sleepy tenant</button>
   </main>
-  <footer><p id="mood" aria-hidden="true">a very small someone, almost awake</p><div class="instruction"><span class="gesture" aria-hidden="true">↔</span><p id="hint">Gently drag the saucer. Give them a little time.</p></div><p class="keys">Arrow keys to move <span>·</span> Space to pause <span>·</span> Home to settle</p><div class="controls"><button id="sound" type="button" aria-pressed="false" aria-label="Enable sound">Sound off</button><button id="pause" type="button" aria-pressed="false">Pause</button></div><span id="announcement" class="sr-only" aria-live="polite"></span></footer>
+  <footer><p id="mood" aria-hidden="true">a small home. a very sleepy tenant.</p><div class="instruction"><span class="gesture" aria-hidden="true">↔</span><p id="hint">Lift the cup. Stroke a sleepy head.</p></div><p class="keys">Tab to choose <span>·</span> Arrows to move <span>·</span> Enter to lift or place</p><div class="controls"><button id="sound" type="button" aria-pressed="false" aria-label="Enable sound">Sound off</button><button id="pause" type="button" aria-pressed="false">Pause</button></div><span id="announcement" class="sr-only" aria-live="polite"></span></footer>
   <script src="audio.js"></script>
   <script src="app.js"></script>
 </body>

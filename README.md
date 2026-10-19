@@ -4,16 +4,20 @@ A tiny creature lives in an oversized ceramic cup. Gently drag its saucer and it
 
 [Play The Sleepy Tenant](https://syymza.github.io/the-sleepy-tenant/)
 
-One scene, one gesture, six small reactions. Handcrafted Canvas art, warm matte ceramic, soft contact shadows and a compact, expressive tenant. The creature moves at fixed proportions, with arms that bend toward the rim and fingers that curl over it.
+One scene, a few gentle gestures, and seven small reactions. Handcrafted Canvas art, warm matte ceramic, soft contact shadows and a compact, expressive tenant. The creature moves at fixed proportions, with arms that bend toward the rim and fingers that curl over it.
 
 ## Play
 
-- Drag the saucer with a mouse or finger. Quick movement makes the tenant hide.
-- Keyboard: Tab to the scene, arrow keys to move, Home to settle, Space to pause.
-- **Sound off** enables optional quiet ceramic movement, a sleepy peeking murmur and a retreat rustle. Sound starts off on every visit. **Sound on** mutes it again.
-- Pause stops the scene and all sound. System reduced-motion preferences remove decorative movement.
+- Drag the mug body or painted handle to lift its little home, with the tenant riding inside. Place it on the table, or bring it near the saucer for a gentle return to its seat.
+- Drag the saucer to slide it. It carries the mug only while the mug is seated on it.
+- Stroke the visible head slowly for a sleepy response. A quick poke makes the tenant duck.
+- Keyboard: Tab chooses the mug, saucer or pet. For the mug, Enter lifts/places and arrows move it. Arrows slide the selected saucer. Enter strokes the selected pet; Shift+Enter gives a quick poke. Home brings everyone back. Space pauses while a scene object is focused.
+- **Sound off** enables optional contact sounds, a sleepy peeking murmur and retreat rustling. The lifted mug does not scrape the table. **Sound on** mutes it again. Sound starts off on every visit.
+- Pause stops motion and sound. Reduced-motion preferences remove decorative movement.
 
-No background music, activation chime, accounts, analytics, external assets or services. The experience works offline. Sound is synthesized locally using Web Audio and unlocks through the sound button's user gesture. After an audio interruption, a new scene gesture resumes it; muted audio stays muted.
+Picking follows the painted shapes, including the handle opening. Empty space has a neutral cursor. Movement and tilt are constrained; landing is deliberately forgiving rather than a free-body simulation. Desktop space is used for movement without simply scaling up the artwork. Resizing ends an active gesture before recalculating coordinates.
+
+No background music, activation chime, accounts, analytics, external assets or services. The experience works offline. Sound is synthesized locally using Web Audio and unlocks through a user gesture. After an interruption, a new scene gesture resumes it; muted audio stays muted.
 
 ## Run locally
 
@@ -36,7 +40,7 @@ npm test
 npm run build
 ```
 
-Checks cover sound opt-in, repeated gestures, cooldowns, bounded voices, mute, pause, pending resumes and suspended contexts. Browser checks use real Web Audio graphs, measure signal peaks and silence, and exercise mouse, touch emulation, keyboard, idle states, reduced motion and responsive layouts in Chromium and WebKit.
+Checks cover independent lifting, table placement, docking, conditional carrying, pet stroke/poke, shape picking, keyboard access, resize/orientation cancellation, bounded layouts and audio lifecycle. Browser checks use real gestures in Chromium and WebKit, including native Chromium touch emulation. Audio checks measure real Web Audio signal peaks and silence. Browser verification opts into a read-only scene snapshot with `?inspect`; it is absent during ordinary play.
 
 `npm run build` copies only the four runtime files into `_site/`, with `.nojekyll` and a `version.json` commit/hash manifest. GitHub Pages deploys this directory after changes reach `main`. Local recordings, screenshots and QA artifacts are ignored and excluded from deployment.
 
