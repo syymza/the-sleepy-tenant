@@ -7,15 +7,21 @@ async function foreground(page){return page.locator('canvas').evaluate(c=>{
 });}
 
 test('desktop, laptop and phone bounds contain rendered objects without overflow',async({page},info)=>{
- test.setTimeout(90000);
+ // Render a fixed number of animation frames, independent of runner speed.
+ // The overall budget covers six high-resolution poses, not recovery timing.
+ test.setTimeout(180000);
+ const epoch=new Date('2026-01-01T00:00:00Z');
+ await page.clock.install({time:epoch});await page.clock.pauseAt(new Date(+epoch+1000));
  for(const [name,width,height]of[['wide',1920,1080],['desktop',1440,1000],['laptop',1280,720],['portrait',390,844],['landscape',844,390],['small',320,568]]){
-  await page.setViewportSize({width,height});await openScene(page);const before=await scene(page),start=await point(page,'mug');
-  await drag(page,start,-2000,-2000,35,18);await page.waitForTimeout(300);let s=await scene(page);
-  expect(s.mug.x).toBeGreaterThanOrEqual(s.limits.mug.minX-.01);expect(s.mug.y).toBeGreaterThanOrEqual(s.limits.mug.minY-.01);expect(s.saucer.x).toBe(before.saucer.x);
-  await expect.poll(async()=>(await scene(page)).pet.expression,{timeout:5000}).not.toBe('startled');await page.waitForTimeout(500);
+  await page.setViewportSize({width,height});await openScene(page);await page.clock.runFor(100);const before=await scene(page),start=await point(page,'mug');
+  await drag(page,start,-2000,-2000,35,18);await page.clock.runFor(160);let s=await scene(page);
+  expect(s.active.kind).toBe('mug');expect(s.pet.expression).toBe('startled');expect(s.pet.reveal).toBeLessThan(.3);
+  await page.clock.runFor(3200);s=await scene(page);
+  expect(s.mug.x).toBeCloseTo(s.limits.mug.minX,2);expect(s.mug.y).toBeCloseTo(s.limits.mug.minY,2);expect(s.saucer.x).toBe(before.saucer.x);
+  expect(s.pet.expression).toBe('curious');expect(s.pet.reveal).toBeGreaterThan(.95);
   const box=await foreground(page);expect(box.left).toBeGreaterThan(3);expect(box.right).toBeLessThan(box.width-3);expect(box.top).toBeGreaterThan(3);expect(box.bottom).toBeLessThan(box.height-3);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth&&document.documentElement.scrollHeight===innerHeight&&scrollX===0&&scrollY===0)).toBe(true);
-  await capture(page,info,name+'-bound');await page.mouse.up();await waitForPlacement(page);
+  await capture(page,info,name+'-bound');await page.mouse.up();await page.clock.runFor(1000);s=await scene(page);expect(s.mug.landing).toBe(null);expect(s.mug.lift).toBeLessThan(.3);
  }
 });
 
