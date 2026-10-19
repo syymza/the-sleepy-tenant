@@ -14,7 +14,7 @@
   });
   soundButton.addEventListener('click',()=>sound.enabled?sound.disable():sound.enable());
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  let reduced = motion.matches, paused = false, w = 0, h = 0, scale = 1, ox = 0, oy = 0, boundX = 105;
+  let reduced = motion.matches, paused = false, w = 0, h = 0, scale = 1, ox = 0, oy = 0, boundX = 105, minY = -27, maxY = 27;
   let now = 0, previous = 0, idle = 0, frightenedUntil = 0, releasedAt = -10;
   let active = null, lastPointer = null, lastInputTime = 0;
   const keys = new Set();
@@ -141,7 +141,7 @@
     if(!paused && !document.hidden){
       now+=dt;
       idle+=dt;
-      if(keys.size){let dx=(keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0),dy=(keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0);state.tx=clamp(state.tx+dx*dt*42,-boundX,boundX);state.ty=clamp(state.ty+dy*dt*27,-27,27);idle=0;}
+      if(keys.size){let dx=(keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0),dy=(keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0);state.tx=clamp(state.tx+dx*dt*42,-boundX,boundX);state.ty=clamp(state.ty+dy*dt*27,minY,maxY);idle=0;}
       state.speed*=Math.exp(-dt*8);
       const moving=active!==null||keys.size>0;
       let expression, target;
@@ -166,9 +166,8 @@
   function draw(t){
     ctx.setTransform(devicePixelRatio>2?2:devicePixelRatio,0,0,devicePixelRatio>2?2:devicePixelRatio,0,0);ctx.clearRect(0,0,w,h);
     ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
-    // Grounded ambient shadow belongs to the room, contact shadows to the saucer.
-    shadow(15,175,269,47,.08);
     ctx.translate(state.x,state.y);
+    shadow(15,175,269,47,.08);
     saucer();
     ctx.save();ctx.rotate(reduced?0:state.lean*.018);cupBack(t);
     ctx.save();ctx.clip(new Path2D('M-103 -250 L103 -250 L103 -24 C103 12 -103 12 -103 -24 Z'));
@@ -176,10 +175,23 @@
     ctx.restore();
   }
   function resize(){
+    // A captured pointer uses the old coordinate system after a layout change.
+    cancel();
     const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
-    scale=Math.min(w/510,h/450,1.35);ox=w/2;oy=h*.5-20*scale;
-    boundX=Math.max(0,Math.min(105,(w/scale-400)/2-12));
+    const roomy=w>=900 && innerHeight>=600;
+    scale=Math.min(w/510,h/450,1.35);ox=w/2;oy=h*.5-(roomy?45:20)*scale;
+    if(roomy){
+      // Include the peeking ears and the full moving ground shadow in the bounds.
+      const margin=24;
+      boundX=Math.max(0,(w/2-margin)/scale-285);
+      minY=Math.min(0,(margin-oy)/scale+135);
+      maxY=Math.max(0,(h-margin-oy)/scale-225);
+    }else{
+      boundX=Math.max(0,Math.min(105,(w/scale-400)/2-12));
+      minY=-27;maxY=27;
+    }
     state.tx=clamp(state.tx,-boundX,boundX);state.x=clamp(state.x,-boundX,boundX);
+    state.ty=clamp(state.ty,minY,maxY);state.y=clamp(state.y,minY,maxY);
   }
   function point(e){const b=canvas.getBoundingClientRect();return {x:(e.clientX-b.left-ox)/scale,y:(e.clientY-b.top-oy)/scale};}
   canvas.addEventListener('pointerdown',e=>{
@@ -190,7 +202,7 @@
   canvas.addEventListener('pointermove',e=>{
     if(active!==e.pointerId)return;e.preventDefault();const p=point(e), elapsed=Math.max((e.timeStamp-lastPointer.t)/1000,.008);
     const dx=p.x-lastPointer.x,dy=p.y-lastPointer.y, speed=Math.hypot(dx,dy)/elapsed;
-    state.tx=clamp(state.tx+dx,-boundX,boundX);state.ty=clamp(state.ty+dy*.65,-27,27);
+    state.tx=clamp(state.tx+dx,-boundX,boundX);state.ty=clamp(state.ty+dy*.65,minY,maxY);
     if(speed>650&&Math.hypot(dx,dy)>10){frightenedUntil=now+2.6;state.speed=speed;}
     lastPointer={...p,t:e.timeStamp};idle=0;
   });
