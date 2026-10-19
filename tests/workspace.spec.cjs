@@ -1,23 +1,40 @@
 const {test,expect}=require('@playwright/test');
-async function box(page){return page.locator('canvas').evaluate(c=>{const r=c.getBoundingClientRect(),d=c.width/r.width,data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let left=c.width,right=0,top=c.height,bottom=0,sumX=0,sumY=0,n=0;for(let y=0;y<c.height;y+=2)for(let x=0;x<c.width;x+=2){const i=(y*c.width+x)*4,R=data[i],G=data[i+1],B=data[i+2];const brown=R>G*1.14&&G>B*1.09&&R<235&&G>70;const green=G>R&&G>B*1.09&&G<225;if(brown||green){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);sumX+=x;sumY+=y;n++;}}return{left:left/d,right:right/d,top:top/d,bottom:bottom/d,x:sumX/n/d,y:sumY/n/d,width:r.width,height:r.height};});}
-async function origin(page){return page.locator('canvas').evaluate(c=>{const r=c.getBoundingClientRect(),s=Math.min(r.width/510,r.height/450,1.35);return{x:r.x+r.width/2-150*s,y:r.y+r.height*.5+110*s,left:r.x,top:r.y,width:r.width,height:r.height};});}
-async function moveToEdge(page,edge){const p=await origin(page);await page.mouse.move(p.x,p.y);await page.mouse.down();const end=edge==='left'?{x:p.left+2,y:p.y}:edge==='right'?{x:p.left+p.width-2,y:p.y}:edge==='up'?{x:p.x,y:p.top+2}:{x:p.x,y:p.top+p.height-2};for(let i=1;i<=32;i++){await page.mouse.move(p.x+(end.x-p.x)*i/32,p.y+(end.y-p.y)*i/32);await page.waitForTimeout(12);}await page.waitForTimeout(450);const result=await box(page);await page.mouse.up();return result;}
-function contained(b){expect(b.left).toBeGreaterThan(12);expect(b.right).toBeLessThan(b.width-12);expect(b.top).toBeGreaterThan(12);expect(b.bottom).toBeLessThan(b.height-12);}
-test('desktop uses the workspace in four directions without growing the artwork',async({page},info)=>{
- await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');await page.waitForTimeout(200);const start=await box(page);
- const results={};for(const edge of ['left','right','up','down']){await page.reload();await page.waitForTimeout(200);results[edge]=await moveToEdge(page,edge);contained(results[edge]);await page.screenshot({path:info.outputPath('desktop-'+edge+'.png')});}
- expect(start.x-results.left.x).toBeGreaterThan(280);expect(results.right.x-start.x).toBeGreaterThan(280);expect(start.y-results.up.y).toBeGreaterThan(80);expect(results.down.y-start.y).toBeGreaterThan(80);
- expect(results.right.right-results.right.left).toBeCloseTo(start.right-start.left,-1);
- await info.attach('workspace-measurements',{body:JSON.stringify({start,results}),contentType:'application/json'});
-});
-test('wide desktop, laptop and phones fit and remain draggable at their bounds',async({page},info)=>{
- for(const [name,width,height] of [['wide',1920,1080],['laptop',1280,720],['portrait',390,844],['landscape',844,390],['small',320,568]]){
-  await page.setViewportSize({width,height});await page.goto('./');await page.waitForTimeout(200);const start=await box(page),left=await moveToEdge(page,'left');contained(left);expect(start.x-left.x).toBeGreaterThan(width>=900?180:15);expect(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth&&document.documentElement.scrollHeight===innerHeight&&scrollX===0&&scrollY===0)).toBe(true);await page.screenshot({path:info.outputPath(name+'-bound.png')});
+const {openScene,scene,point,drag,waitForPlacement,capture}=require('./helpers.cjs');
+async function foreground(page){return page.locator('canvas').evaluate(c=>{
+ const r=c.getBoundingClientRect(),d=c.width/r.width,data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let left=c.width,right=0,top=c.height,bottom=0;
+ for(let y=0;y<c.height;y+=2)for(let x=0;x<c.width;x+=2){const i=(y*c.width+x)*4,R=data[i],G=data[i+1],B=data[i+2];if(R-B>28&&G-B>14&&R<249&&G<239){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}}
+ return{left:left/d,right:right/d,top:top/d,bottom:bottom/d,width:r.width,height:r.height};
+});}
+
+test('desktop, laptop and phone bounds contain rendered objects without overflow',async({page},info)=>{
+ test.setTimeout(90000);
+ for(const [name,width,height]of[['wide',1920,1080],['desktop',1440,1000],['laptop',1280,720],['portrait',390,844],['landscape',844,390],['small',320,568]]){
+  await page.setViewportSize({width,height});await openScene(page);const before=await scene(page),start=await point(page,'mug');
+  await drag(page,start,-2000,-2000,35,18);await page.waitForTimeout(300);let s=await scene(page);
+  expect(s.mug.x).toBeGreaterThanOrEqual(s.limits.mug.minX-.01);expect(s.mug.y).toBeGreaterThanOrEqual(s.limits.mug.minY-.01);expect(s.saucer.x).toBe(before.saucer.x);
+  await expect.poll(async()=>(await scene(page)).pet.expression,{timeout:5000}).not.toBe('startled');await page.waitForTimeout(500);
+  const box=await foreground(page);expect(box.left).toBeGreaterThan(3);expect(box.right).toBeLessThan(box.width-3);expect(box.top).toBeGreaterThan(3);expect(box.bottom).toBeLessThan(box.height-3);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth&&document.documentElement.scrollHeight===innerHeight&&scrollX===0&&scrollY===0)).toBe(true);
+  await capture(page,info,name+'-bound');await page.mouse.up();await waitForPlacement(page);
  }
 });
-test('resize ends the captured drag before changing its coordinate system',async({page})=>{
- await page.setViewportSize({width:1440,height:1000});await page.goto('./');await page.waitForTimeout(200);const p=await origin(page);await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x+12,p.y);await page.waitForTimeout(150);await page.setViewportSize({width:900,height:700});await page.waitForTimeout(400);const before=await box(page);await page.mouse.move(p.x+13,p.y);await page.waitForTimeout(200);const after=await box(page);expect(Math.abs(after.x-before.x)).toBeLessThan(2);expect(Math.abs(after.y-before.y)).toBeLessThan(2);await page.mouse.up();contained(after);
+
+test('resize ends capture before changing pointer coordinates',async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});await openScene(page);const start=await point(page,'mug');await drag(page,start,18,0,6,30);await page.setViewportSize({width:1100,height:740});await expect.poll(async()=>(await scene(page)).active).toBe(null);await waitForPlacement(page);const before=await scene(page);await page.mouse.move(start.x+19,start.y);await page.waitForTimeout(200);const after=await scene(page);expect(after.mug.x).toBeCloseTo(before.mug.x,1);expect(after.mug.y).toBeCloseTo(before.mug.y,1);await page.mouse.up();
 });
-test('orientation change cancels a touch drag and keeps the scene visible',async({browser,browserName})=>{
- test.skip(browserName!=='chromium','Native touch protocol is Chromium-specific.');const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const page=await context.newPage();await page.goto(process.env.BASE_URL||'http://127.0.0.1:4173');await page.waitForTimeout(200);const cdp=await context.newCDPSession(page),p=await origin(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:p.x,y:p.y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+10,y:p.y}]});await page.waitForTimeout(100);await page.setViewportSize({width:844,height:390});await page.waitForTimeout(400);const before=await box(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+11,y:p.y}]});await page.waitForTimeout(250);const after=await box(page);expect(Math.abs(after.x-before.x)).toBeLessThan(2);contained(after);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await context.close();
+
+test('regrabbing during settling keeps the mug under the new gesture',async({page})=>{
+ await openScene(page);await drag(page,await point(page,'mug'),-55,0,15,20);await page.mouse.up();await page.waitForTimeout(40);const before=await scene(page),p=await point(page,'mug');
+ await page.mouse.move(p.x,p.y);await page.mouse.down();const captured=await scene(page);await page.waitForTimeout(150);let s=await scene(page);expect(s.active.kind).toBe('mug');expect(s.mug.x).toBeCloseTo(captured.mug.x,1);expect(s.mug.landing).toBe(null);
+ await page.mouse.move(p.x+20,p.y);await page.waitForTimeout(150);s=await scene(page);expect(s.active.dragged).toBe(true);expect(s.mug.lift).toBeGreaterThan(5);await page.mouse.up();await waitForPlacement(page);
+});
+
+test('native phone touch supports lifting, stroke/poke, cancellation and orientation',async({browser,browserName},info)=>{
+ test.skip(browserName!=='chromium','Native touch protocol is Chromium-specific; WebKit covers the same model and touch audio activation.');
+ const context=await browser.newContext({baseURL:info.project.use.baseURL,viewport:{width:390,height:844},isMobile:true,hasTouch:true}),page=await context.newPage();await openScene(page);const cdp=await context.newCDPSession(page);let s=await scene(page),p=await point(page,'mug');
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});for(let i=1;i<=25;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x-20*i/25,y:p.y-110*s.camera.scale*i/25}]});await page.waitForTimeout(30);}await capture(page,info,'touch-held');await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await waitForPlacement(page);s=await scene(page);expect(s.mug.seated).toBe(false);expect(s.mug.y).toBeLessThan(-80);
+ p=await point(page,'mug');await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+12,y:p.y}]});await page.waitForTimeout(150);await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await waitForPlacement(page);expect((await scene(page)).active).toBe(null);
+ await page.locator('[data-object="mug"]').focus();await page.keyboard.press('Home');await waitForPlacement(page);p=await point(page,'pet',-12,0);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});for(let i=1;i<=20;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+i,y:p.y}]});await page.waitForTimeout(35);}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect.poll(async()=>(await scene(page)).pet.expression).toBe('petted');
+ p=await point(page,'pet',0,0);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});await page.waitForTimeout(50);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect.poll(async()=>(await scene(page)).pet.expression).toBe('startled');
+ p=await point(page,'mug');await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+12,y:p.y}]});await page.waitForTimeout(100);await page.setViewportSize({width:844,height:390});await expect.poll(async()=>(await scene(page)).active).toBe(null);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await waitForPlacement(page);expect(await page.evaluate(()=>scrollX===0&&scrollY===0)).toBe(true);await capture(page,info,'touch-landscape');await context.close();
 });

@@ -1,45 +1,59 @@
 const {test,expect}=require('@playwright/test');
-async function saucer(page,dx=0){return page.locator('canvas').evaluate((c,dx)=>{const r=c.getBoundingClientRect(),s=Math.min(r.width/510,r.height/450,1.35);return{x:r.x+r.width/2+dx*s,y:r.y+r.height*.5+130*s};},dx);}
-async function drag(page,p,dx,steps=18,delay=40){await page.mouse.move(p.x,p.y);await page.mouse.down();for(let i=1;i<=steps;i++){await page.mouse.move(p.x+dx*i/steps,p.y);await page.waitForTimeout(delay);}}
-test('gentle drag, release, fast retreat, recovery and contained geometry',async({page},testInfo)=>{
- const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('./');await page.waitForTimeout(250);
- await drag(page,await saucer(page),28);await expect(page.locator('#mood')).toContainText('is that you');await page.waitForTimeout(700);
- await page.screenshot({path:testInfo.outputPath('curious.png')});await page.mouse.up();await expect(page.locator('#mood')).toContainText('good place');
- const p=await saucer(page,28/(await page.locator('canvas').evaluate(c=>Math.min(c.clientWidth/510,c.clientHeight/450,1.35))));
- await drag(page,p,-180,2,15);await expect(page.locator('#mood')).toContainText('slower');await page.waitForTimeout(450);await page.screenshot({path:testInfo.outputPath('retreat.png')});
- const green=await page.locator('canvas').evaluate(c=>{const r=c.getBoundingClientRect(),s=Math.min(r.width/510,r.height/450,1.35),d=c.width/r.width,b=Math.max(0,Math.min(105,(r.width/s-400)/2-12));const px=c.getContext('2d').getImageData(Math.round((r.width/2-b*s)*d),Math.round((r.height*.5+142*s)*d),1,1).data;return px[1]>=px[0];});expect(green).toBe(true);
- await page.mouse.up();await expect(page.locator('#mood')).not.toContainText('slower',{timeout:5000});expect(errors).toEqual([]);
+const {openScene,scene,point,drag,waitForPlacement,parkMug,capture}=require('./helpers.cjs');
+
+test('painted objects have honest hit targets and cursors',async({page})=>{
+ await openScene(page);
+ for(const [kind,x,y,cursor]of[['mug',0,65,'grab'],['mug',175,40,'grab'],['mug',140,40,'default'],['pet',0,0,'pointer'],['tray',205,205,'default'],['mug',-230,-80,'default']]){
+  const p=await point(page,kind,x,y);await page.mouse.move(p.x,p.y);
+  await expect(page.locator('canvas')).toHaveCSS('cursor',cursor);
+ }
+ const handle=await point(page,'mug',175,40);await drag(page,handle,-15,0,8,30);
+ await expect.poll(async()=>(await scene(page)).mug.lift).toBeGreaterThan(10);
+ expect((await scene(page)).active.kind).toBe('mug');await expect(page.locator('canvas')).toHaveCSS('cursor','grabbing');await page.mouse.up();await waitForPlacement(page);
 });
-test('idle peeking and nesting remain timed and visually coherent',async({page},testInfo)=>{
- await page.clock.install();await page.goto('./');await page.clock.runFor(7500);await expect(page.locator('#mood')).toContainText('checking');await page.screenshot({path:testInfo.outputPath('peeking.png')});await page.clock.runFor(5700);await expect(page.locator('#mood')).toContainText('tuck');await page.screenshot({path:testInfo.outputPath('nesting.png')});
+
+test('mug lifts independently and settles on the table',async({page},info)=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await openScene(page);
+ const {initial}=await parkMug(page);let s=await scene(page);
+ expect(s.mug.seated).toBe(false);expect(s.mug.lift).toBeGreaterThan(10);
+ expect(s.saucer.x).toBeCloseTo(initial.saucer.x,2);expect(s.saucer.y).toBeCloseTo(initial.saucer.y,2);
+ await capture(page,info,'mug-held');await page.mouse.up();await waitForPlacement(page);s=await scene(page);
+ expect(s.mug.seated).toBe(false);expect(Math.abs(s.mug.tilt)).toBeLessThan(.01);
+ await capture(page,info,'mug-on-table');expect(errors).toEqual([]);
 });
-test('keyboard pause and reduced motion',async({page})=>{
- await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');await page.waitForTimeout(300);const canvas=page.locator('canvas');const initial=await canvas.evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await canvas.evaluate(c=>c.toDataURL())).toBe(initial);
- await canvas.focus();await page.keyboard.down('ArrowRight');await expect(page.locator('#mood')).toContainText('is that you');await page.keyboard.up('ArrowRight');await page.keyboard.press('Space');await expect(page.locator('#pause')).toHaveAttribute('aria-pressed','true');await page.waitForTimeout(50);const frozen=await canvas.evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await canvas.evaluate(c=>c.toDataURL())).toBe(frozen);await page.getByRole('button',{name:'Resume',exact:true}).click();await expect(page.locator('#pause')).toHaveAttribute('aria-pressed','false');await canvas.focus();await page.keyboard.press('Home');
+
+test('empty saucer moves alone, nearby mug docks, seated pair travels together',async({page},info)=>{
+ await openScene(page);await parkMug(page);await page.mouse.up();await waitForPlacement(page);
+ let s=await scene(page);const parked={...s.mug},dx=s.camera.w>=900?90:20;
+ await drag(page,await point(page,'tray',-150,151),dx*s.camera.scale);await page.mouse.up();await page.waitForTimeout(350);s=await scene(page);
+ expect(s.mug.x).toBeCloseTo(parked.x,1);expect(s.mug.y).toBeCloseTo(parked.y,1);expect(s.saucer.x).toBeGreaterThan(dx-2);
+ await capture(page,info,'separate-objects');
+ const target={x:s.saucer.x+8,y:s.saucer.y+4};await drag(page,await point(page,'mug'),(target.x-s.mug.x)*s.camera.scale,(target.y-s.mug.y)*s.camera.scale,55,25);await page.mouse.up();await waitForPlacement(page);s=await scene(page);
+ expect(s.mug.seated).toBe(true);expect(s.mug.x).toBeCloseTo(s.saucer.x,2);expect(s.mug.y).toBeCloseTo(s.saucer.y,2);await capture(page,info,'docked');
+ const before=s.saucer.x;await drag(page,await point(page,'tray',-150,151),-15*s.camera.scale);await page.mouse.up();await page.waitForTimeout(350);s=await scene(page);
+ expect(s.saucer.x).toBeLessThan(before-10);expect(s.mug.seated).toBe(true);expect(s.mug.x).toBeCloseTo(s.saucer.x,2);expect(s.mug.y).toBeCloseTo(s.saucer.y,2);
 });
-test('responsive scene and controls fit all supported sizes without network dependencies',async({page},testInfo)=>{
- const external=[],origin=new URL(test.info().project.use.baseURL||process.env.BASE_URL||'http://127.0.0.1:4173').origin;page.on('request',r=>{if(!r.url().startsWith(origin))external.push(r.url());});await page.goto('./');
- for(const [name,width,height] of [['desktop',1440,1000],['portrait',390,844],['landscape',844,390],['small',320,568]]){await page.setViewportSize({width,height});await page.waitForTimeout(160);expect(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth&&document.documentElement.scrollHeight===innerHeight)).toBe(true);for(const id of ['sound','pause']){const r=await page.locator('#'+id).boundingBox();expect(r.x).toBeGreaterThanOrEqual(0);expect(r.y+r.height).toBeLessThanOrEqual(height);}await page.screenshot({path:testInfo.outputPath(name+'.png')});}expect(external).toEqual([]);
+
+test('slow stroke soothes, quick poke ducks, and the resident stays in its cup',async({page},info)=>{
+ await openScene(page);const before=await scene(page);
+ await drag(page,await point(page,'pet',-18,0),30,0,20,35);await page.mouse.up();await expect.poll(async()=>(await scene(page)).pet.expression).toBe('petted');await page.waitForTimeout(250);await capture(page,info,'stroke');
+ let s=await scene(page);expect(s.mug.x).toBe(before.mug.x);expect(s.mug.y).toBe(before.mug.y);expect(s.saucer.x).toBe(before.saucer.x);
+ const p=await point(page,'pet',0,0);await page.mouse.move(p.x,p.y);await page.mouse.down();await page.waitForTimeout(50);await page.mouse.up();await expect.poll(async()=>(await scene(page)).pet.reveal).toBeLessThan(.1);s=await scene(page);expect(s.pet.expression).toBe('startled');await capture(page,info,'poke');
+ const floor=await point(page,'mug',0,162);
+ const pixel=await page.locator('canvas').evaluate((c,p)=>{const r=c.getBoundingClientRect(),d=c.width/r.width;return Array.from(c.getContext('2d').getImageData(Math.round((p.x-r.x)*d),Math.round((p.y-r.y)*d),1,1).data);},floor);
+ expect(pixel[1]).toBeGreaterThanOrEqual(pixel[0]);
+ await expect.poll(async()=>(await scene(page)).pet.reveal,{timeout:5000}).toBeGreaterThan(.35);
 });
-test('native touch drag, release and cancellation avoid page scrolling',async({browser,browserName})=>{
- test.skip(browserName!=='chromium','Native touch protocol is Chromium-specific; WebKit exercises touch activation below.');
- const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const page=await context.newPage();await page.goto(test.info().project.use.baseURL||process.env.BASE_URL||'http://127.0.0.1:4173');await page.waitForTimeout(250);const cdp=await context.newCDPSession(page),p=await saucer(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});for(let i=1;i<=20;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+i,y:p.y}]});await page.waitForTimeout(35);}await expect(page.locator('#mood')).toContainText('is that you');await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect(page.locator('#mood')).toContainText('good place');expect(await page.evaluate(()=>scrollX===0&&scrollY===0)).toBe(true);const p2=await saucer(page,20/(390/510));await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p2]});await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await expect(page.locator('#mood')).not.toContainText('is that you');await context.close();
+
+test('keyboard object controls, pause, reset and reduced motion remain usable',async({page})=>{
+ await openScene(page);await page.locator('[data-object="mug"]').focus();await page.keyboard.press('Enter');await expect.poll(async()=>(await scene(page)).mug.lift).toBeGreaterThan(10);
+ await page.keyboard.down('ArrowDown');await page.waitForTimeout(1400);await page.keyboard.up('ArrowDown');await page.keyboard.press('Enter');await waitForPlacement(page);expect((await scene(page)).mug.seated).toBe(false);
+ await page.locator('[data-object="pet"]').focus();await page.keyboard.press('Enter');await expect.poll(async()=>(await scene(page)).pet.expression).toBe('petted');await page.keyboard.press('Shift+Enter');await expect.poll(async()=>(await scene(page)).pet.expression).toBe('startled');
+ await page.getByRole('button',{name:'Pause',exact:true}).click();await expect(page.locator('#pause')).toHaveAttribute('aria-pressed','true');await page.waitForTimeout(50);const frozen=await page.locator('canvas').evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await page.locator('canvas').evaluate(c=>c.toDataURL())).toBe(frozen);await page.getByRole('button',{name:'Resume',exact:true}).click();
+ await page.locator('[data-object="mug"]').focus();await page.keyboard.press('Home');await waitForPlacement(page);expect((await scene(page)).mug.seated).toBe(true);
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.waitForTimeout(250);const still=await page.locator('canvas').evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await page.locator('canvas').evaluate(c=>c.toDataURL())).toBe(still);
 });
-test('real audio is opt-in, bounded, muteable and recovers from suspension',async({page,isMobile},testInfo)=>{
- await page.addInitScript(()=>{let value;Object.defineProperty(globalThis,'SleepySound',{configurable:true,get:()=>value,set:Base=>{value=class extends Base{constructor(...args){super(...args);globalThis.__sound=this;}};}});});
- await page.goto('./');await page.waitForTimeout(300);expect(await page.evaluate(()=>__sound.context)).toBe(null);await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','false');
- const activate=async()=>{if(isMobile)await page.getByRole('button',{name:'Enable sound',exact:true}).tap();else await page.getByRole('button',{name:'Enable sound',exact:true}).click();};await activate();await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','true');
- expect(await page.evaluate(()=>({state:__sound.context.state,voices:__sound.voices.size,scrape:__sound.scrape}))).toEqual({state:'running',voices:0,scrape:null});
- await page.evaluate(()=>{const c=__sound.context,a=c.createAnalyser(),zero=c.createGain();zero.gain.value=0;__sound.master.connect(a);a.connect(zero).connect(c.destination);globalThis.__analyser=a;globalThis.__peak=0;globalThis.__meter=setInterval(()=>{const data=new Float32Array(a.fftSize);a.getFloatTimeDomainData(data);for(const v of data)__peak=Math.max(__peak,Math.abs(v));},8);});
- await drag(page,await saucer(page),25);expect(await page.evaluate(()=>!!__sound.scrape)).toBe(true);await page.mouse.up();
- await page.locator('canvas').focus();await page.keyboard.press('Home');await page.waitForTimeout(300);
- await drag(page,await saucer(page),-160,2,15);await expect(page.locator('#mood')).toContainText('slower');expect(await page.evaluate(()=>__sound.voices.size)).toBeGreaterThan(0);await page.mouse.up();
- for(let i=0;i<20;i++)await page.evaluate(()=>__sound.react('startled'));expect(await page.evaluate(()=>__sound.voices.size)).toBeLessThanOrEqual(2);
- await page.getByRole('button',{name:'Mute sound',exact:true}).click();expect(await page.evaluate(()=>({enabled:__sound.enabled,voices:__sound.voices.size,scrape:__sound.scrape}))).toEqual({enabled:false,voices:0,scrape:null});await page.waitForTimeout(250);
- await activate();expect(await page.evaluate(()=>__sound.voices.size)).toBe(0);await page.evaluate(()=>__sound.react('peeking'));await page.waitForTimeout(500);expect(await page.evaluate(()=>__sound.voices.size)).toBe(0);
- const peak=await page.evaluate(()=>__peak);expect(peak).toBeGreaterThan(.0001);expect(peak).toBeLessThan(.12);await testInfo.attach('measured-audio.json',{body:JSON.stringify({peak,maximumVoices:2,startupVoices:0}),contentType:'application/json'});
- await page.evaluate(()=>__sound.context.suspend());expect(await page.evaluate(()=>__sound.context.state)).toBe('suspended');await page.locator('canvas').focus();await page.keyboard.down('ArrowLeft');await expect.poll(()=>page.evaluate(()=>__sound.context.state)).toBe('running');await page.keyboard.up('ArrowLeft');
- await page.getByRole('button',{name:'Pause',exact:true}).click();expect(await page.evaluate(()=>({voices:__sound.voices.size,scrape:__sound.scrape,blocked:__sound.blocked}))).toEqual({voices:0,scrape:null,blocked:true});await page.getByRole('button',{name:'Resume',exact:true}).click();
- await page.evaluate(()=>__sound.context.suspend());await page.getByRole('button',{name:'Mute sound',exact:true}).click();await page.locator('canvas').focus();await page.keyboard.press('ArrowLeft');expect(await page.evaluate(()=>__sound.context.state)).toBe('suspended');await activate();await expect.poll(()=>page.evaluate(()=>__sound.context.state)).toBe('running');await page.getByRole('button',{name:'Mute sound',exact:true}).click();await page.waitForTimeout(150);expect(await page.evaluate(()=>{const data=new Float32Array(__analyser.fftSize);__analyser.getFloatTimeDomainData(data);return Math.max(...data.map(Math.abs));})).toBeLessThan(.0001);
- await page.evaluate(()=>clearInterval(__meter));
+
+test('idle peeking and quilt adjustment retain their timing',async({page},info)=>{
+ await page.clock.install();await openScene(page);await page.clock.runFor(7500);await expect.poll(async()=>(await scene(page)).pet.expression).toBe('peeking');await capture(page,info,'idle-peeking');await page.clock.runFor(5700);await expect.poll(async()=>(await scene(page)).pet.expression).toBe('nesting');await capture(page,info,'idle-nesting');
 });

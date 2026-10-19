@@ -122,6 +122,13 @@ globalThis.SleepySound = class SleepySound {
       this.lastRustle = t;this.rustle();
     }
   }
+  place() {
+    if(!this.ready() || this.voices.size>=2)return;
+    const t=this.context.currentTime,source=this.context.createOscillator(),gain=this.context.createGain();
+    source.frequency.setValueAtTime(820,t);source.frequency.exponentialRampToValueAtTime(610,t+.09);
+    gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(.018,t+.004);gain.gain.exponentialRampToValueAtTime(.0001,t+.09);gain.gain.linearRampToValueAtTime(0,t+.11);
+    source.connect(gain).connect(this.master);this.voice(source,[source,gain],.13);
+  }
   voice(source, nodes, duration) {
     const voice = {finish: stop => {
       if (!this.voices.delete(voice)) return;
