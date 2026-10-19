@@ -14,6 +14,9 @@ globalThis.SleepySound = class SleepySound {
     this.generation = 0;
     this.lastPeek = -Infinity;
     this.lastRustle = -Infinity;
+    this.lastContact = -Infinity;
+    this.contactVoice = null;
+    this.foley = null;
   }
   async enable() {
     const attempt = ++this.generation;
@@ -23,7 +26,7 @@ globalThis.SleepySound = class SleepySound {
         const Audio = globalThis.AudioContext || globalThis.webkitAudioContext;
         if (!Audio) throw new Error('Audio unavailable');
         this.context = new Audio({latencyHint:'interactive'});
-        this.purrBuffer = null;this.purrLoading = null;
+        this.purrBuffer = null;this.purrLoading = null;this.foley = null;
         this.master = this.context.createGain();
         this.master.gain.value = 0;
         this.master.connect(this.context.destination);
@@ -35,6 +38,7 @@ globalThis.SleepySound = class SleepySound {
           if (this.context === context && context.state !== 'running') this.stop();
         });
       }
+      this.loadFoley();
       // Explicit opt-in uses media playback routing, including iPhone silent mode.
       // Unsupported or restricted session APIs must not prevent ordinary audio.
       try {
@@ -94,11 +98,7 @@ globalThis.SleepySound = class SleepySound {
     const t = this.context.currentTime;
     this.master.gain.cancelScheduledValues(t);
     this.master.gain.setTargetAtTime(0, t, .008);
-    if (this.scrape) {
-      this.scrape.source.stop();
-      this.scrape.nodes.forEach(n => n.disconnect());
-      this.scrape = null;
-    }
+    this.stopScrape();
     this.stopPurr();
     for (const voice of [...this.voices]) voice.finish(true);
   }
@@ -135,27 +135,36 @@ globalThis.SleepySound = class SleepySound {
     if (stroking) voice.quietSince=null;
     else {voice.quietSince??=t;if(t-voice.quietSince>.45)this.stopPurr();}
   }
+  loadFoley() {
+    if (this.foley) return;
+    this.foley = {};
+    for (const [name,clip] of Object.entries(SleepyFoleyRecording)) {
+      const bytes=atob(clip.pcm16),buffer=this.context.createBuffer(1,bytes.length/2,clip.sampleRate),data=buffer.getChannelData(0);
+      for(let i=0;i<data.length;i++){const value=bytes.charCodeAt(i*2)|(bytes.charCodeAt(i*2+1)<<8);data[i]=(value&32768?value-65536:value)/32768;}
+      this.foley[name]=buffer;
+    }
+  }
+  stopScrape() {
+    if (!this.scrape) return;
+    try {this.scrape.source.stop();} catch {}
+    this.scrape.nodes.forEach(n=>n.disconnect());this.scrape=null;
+  }
   motion(speed) {
-    if (!this.ready()) return;
-    const t = this.context.currentTime;
-    if (speed > 2 && !this.scrape) {
-      const source = this.context.createBufferSource();
-      source.buffer = this.noise; source.loop = true;
-      const filter = this.context.createBiquadFilter();
-      filter.type = 'bandpass'; filter.frequency.value = 760; filter.Q.value = .55;
-      const gain = this.context.createGain(); gain.gain.value = 0;
-      source.connect(filter).connect(gain).connect(this.master);source.start();
-      this.scrape = {source,gain,nodes:[source,filter,gain],quietSince:null};
+    if (!this.ready()) {this.stopScrape();return;}
+    const t=this.context.currentTime,sliding=speed>=5;
+    if (sliding && !this.scrape) {
+      const source=this.context.createBufferSource(),gain=this.context.createGain();
+      source.buffer=this.foley.scrape;source.loop=true;gain.gain.value=0;
+      source.connect(gain).connect(this.master);source.start();
+      this.scrape={source,gain,nodes:[source,gain],quietSince:null};
     }
     if (!this.scrape) return;
-    const amount = Math.min(speed / 180, 1);
-    this.scrape.gain.gain.setTargetAtTime(speed > 1 ? .065 * Math.sqrt(amount) : 0, t, .045);
-    if (speed < 1) {
-      this.scrape.quietSince ??= t;
-      if (t-this.scrape.quietSince > .3) {
-        this.scrape.source.stop();this.scrape.nodes.forEach(n=>n.disconnect());this.scrape=null;
-      }
-    } else this.scrape.quietSince = null;
+    const amount=Math.sqrt(Math.min(speed/240,1));
+    this.scrape.gain.gain.setTargetAtTime(sliding?.009+.010*amount:0,t,.025);
+    if (!sliding) {
+      this.scrape.quietSince??=t;
+      if(t-this.scrape.quietSince>.08)this.stopScrape();
+    } else this.scrape.quietSince=null;
   }
   react(expression) {
     if (!this.ready() || this.voices.size >= 2) return;
@@ -167,22 +176,30 @@ globalThis.SleepySound = class SleepySound {
       this.lastRustle = t;this.rustle();
     }
   }
-  place() {
-    if(!this.ready() || this.voices.size>=2)return;
-    const t=this.context.currentTime,source=this.context.createOscillator(),gain=this.context.createGain();
-    source.frequency.setValueAtTime(820,t);source.frequency.exponentialRampToValueAtTime(610,t+.09);
-    gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(.018,t+.004);gain.gain.exponentialRampToValueAtTime(.0001,t+.09);gain.gain.linearRampToValueAtTime(0,t+.11);
-    source.connect(gain).connect(this.master);this.voice(source,[source,gain],.13);
+  place(surface='ceramic',normalSpeed=100) {
+    if(!this.ready()||this.voices.size>=2||!['ceramic','table'].includes(surface))return false;
+    const t=this.context.currentTime;
+    if(t-this.lastContact<.18)return false;
+    this.lastContact=t;
+    if(this.contactVoice)this.contactVoice.finish(true);
+    const source=this.context.createBufferSource(),gain=this.context.createGain();
+    source.buffer=this.foley[surface];
+    const energy=Math.min(Math.max(normalSpeed,0)/180,1);
+    gain.gain.value=surface==='ceramic'?.018+.020*energy:.010+.012*energy;
+    source.connect(gain).connect(this.master);
+    this.contactVoice=this.voice(source,[source,gain],source.buffer.duration);
+    return true;
   }
   voice(source, nodes, duration) {
     const voice = {finish: stop => {
       if (!this.voices.delete(voice)) return;
       source.onended = null;
+      if(this.contactVoice===voice)this.contactVoice=null;
       if (stop) { try {source.stop();} catch {} }
       nodes.forEach(n=>n.disconnect());
     }};
     this.voices.add(voice);source.onended=()=>voice.finish(false);
-    source.start();source.stop(this.context.currentTime+duration);
+    source.start();source.stop(this.context.currentTime+duration);return voice;
   }
   murmur() {
     const t=this.context.currentTime, source=this.context.createOscillator();

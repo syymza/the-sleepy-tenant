@@ -20,7 +20,7 @@
   let active=null,keyboardHeld=false,selected='mug',focused=null,hover=null,strokeLean=0;
   const keys=new Set();
   const tray={x:0,y:0,tx:0,ty:0};
-  const mug={x:0,y:0,tx:0,ty:0,lift:0,tilt:0,seated:true,landing:null};
+  const mug={x:0,y:0,tx:0,ty:0,lift:0,fallSpeed:0,tilt:0,seated:true,landing:null};
   const state={lean:0,reveal:.72,expression:'sleepy'};
   const limits={tray:{},mug:{}};
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -153,7 +153,7 @@
     const p=fit('mug',cancelled?mug.x:mug.tx,cancelled?mug.y:mug.ty);
     const seat=overlaps(p.x,p.y);
     mug.tx=seat?tray.tx:p.x;mug.ty=seat?tray.ty:p.y;
-    mug.landing={seat};keyboardHeld=false;
+    mug.landing={seat,silent:cancelled,contacted:false,airborne:mug.lift>1};mug.fallSpeed=0;keyboardHeld=false;
     releasedAt=now;idle=0;
   }
   function mugPoint(point){
@@ -183,6 +183,7 @@
   function finishGesture(cancelled=false){
     if(!active)return;
     const gesture=active;active=null;sound.purr(false);releaseCapture(gesture.id);
+    if(cancelled){sound.stop();if(gesture.kind==='tray'){tray.tx=tray.x;tray.ty=tray.y;}}
     if(gesture.kind==='mug'&&(gesture.dragged||gesture.wasSettling))landMug(cancelled);
     else if(gesture.kind==='pet'){
       if(!cancelled&&!gesture.stroked&&now-gesture.time<.3&&gesture.travel<12)frightenedUntil=now+1.5;
@@ -191,7 +192,7 @@
     hover=null;updateCursor();
   }
   function cancel(){keyboardPurrUntil=0;sound.purr(false);finishGesture(true);keys.clear();if(keyboardHeld)landMug(true);keyboardHeld=false;}
-  function reset(){cancel();tray.tx=0;tray.ty=0;mug.tx=0;mug.ty=0;mug.landing={seat:true};releasedAt=now;}
+  function reset(){cancel();tray.tx=0;tray.ty=0;mug.tx=0;mug.ty=0;mug.landing={seat:true,silent:true,contacted:false,airborne:false};mug.fallSpeed=0;releasedAt=now;}
   function keyboard(e,kind=selected){
     if(e.code==='Space'){e.preventDefault();if(!e.repeat)togglePause();return;}
     if(paused)return;
@@ -277,11 +278,28 @@
       }
       let targetLift=(active?.kind==='mug'&&active.dragged)||keyboardHeld?liftHeight():0;
       if(active?.kind==='mug'&&!active.dragged&&active.wasSettling)targetLift=active.heldLift;
-      if(mug.landing?.seat&&Math.hypot(mug.tx-mug.x,mug.ty-mug.y)>7)targetLift=liftHeight();
-      mug.lift=mix(mug.lift,targetLift,1-Math.exp(-dt*(targetLift?13:10)));
-      if(mug.landing&&Math.hypot(mug.tx-mug.x,mug.ty-mug.y)<.6&&mug.lift<.3){mug.x=mug.tx;mug.y=mug.ty;mug.lift=0;mug.seated=mug.landing.seat;mug.landing=null;releasedAt=now;sound.place?.();}
+      const align=Math.hypot(mug.tx-mug.x,mug.ty-mug.y);
+      if(mug.landing){
+        const landing=mug.landing;
+        if(!landing.contacted){
+          if(landing.seat&&align>7){
+            mug.lift=mix(mug.lift,liftHeight(),1-Math.exp(-dt*13));mug.fallSpeed=0;
+          }else{
+            // Finite descent gives each real contact a measurable normal velocity.
+            mug.fallSpeed+=360*dt;const next=mug.lift-mug.fallSpeed*dt;
+            if(next<=0){
+              const impactSpeed=mug.fallSpeed;mug.lift=0;mug.fallSpeed=0;landing.contacted=true;
+              if(landing.airborne&&!landing.silent)sound.place(landing.seat?'ceramic':'table',impactSpeed);
+            }else mug.lift=next;
+          }
+        }
+        if(landing.contacted&&align<.6){mug.x=mug.tx;mug.y=mug.ty;mug.seated=landing.seat;mug.landing=null;releasedAt=now;}
+      }else{
+        mug.lift=mix(mug.lift,targetLift,1-Math.exp(-dt*(targetLift?13:10)));mug.fallSpeed=0;
+      }
       const vx=(mug.x-oldCupX)/dt,vy=(mug.y-oldCupY)/dt,traySpeed=Math.hypot(tray.x-oldTrayX,tray.y-oldTrayY)/dt;
-      sound.motion(Math.max(traySpeed,mug.lift<1&&!mug.seated?Math.hypot(vx,vy):0));
+      // The saucer stays on the table. Mug drags are lifts, never surface scrapes.
+      sound.motion(traySpeed);
       if(Math.hypot(vx,vy)>480&&((active?.dragged&&active.kind!=='pet')||keyboardHeld))frightenedUntil=now+1.6;
       mug.tilt=mix(mug.tilt,reduced?0:clamp(-vx*.00015,-.045,.045),1-Math.exp(-dt*9));
       if(active?.kind==='pet'&&now-active.time>.38&&!active.stroked&&now>frightenedUntil){active.stroked=true;pettedUntil=now+2.6;}
