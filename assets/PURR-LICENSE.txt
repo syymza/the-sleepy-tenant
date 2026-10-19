@@ -1,0 +1,23 @@
+The Sleepy Tenant: recorded cat purr
+
+Recording: Purring cat.oga, by Mysid (31 July 2007)
+Source: https://commons.wikimedia.org/wiki/File:Purring_cat.oga
+Original: https://upload.wikimedia.org/wikipedia/commons/d/db/Purring_cat.oga
+License: Public domain dedication by the copyright holder, worldwide.
+Where such dedication is not legally possible, the creator grants use for any
+purpose without conditions unless conditions are required by law.
+Verified against the source page's Licensing section on 19 October 2026.
+
+Original Ogg SHA-256:
+8e90102e81da15d0beb050317dab1b55fb6ad4d29abc91b0e0e7a72433bbcb7b
+
+Edits for the user-approved preview: excerpt 1-7 seconds; mono 48 kHz PCM;
+fixed gain 0.025; 40 Hz high-pass and 1600 Hz low-pass filters;
+250 ms fade in and 350 ms fade out. No pitch change, added pulses or normalization.
+Approved WAV SHA-256:
+2a745db9f10b0b74316795b17c9d7290738256946f0d61f8e20011428fb48ecb
+
+The exact approved WAV bytes are embedded losslessly in purr.js. Playback adds
+only gesture attack/release fades and repeats the six-second recording, whose
+existing end fades avoid clicks. No audio is fetched from external services.
+This recording is public domain and is separate from the project's MIT code.

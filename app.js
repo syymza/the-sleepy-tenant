@@ -16,6 +16,7 @@
   const motion=matchMedia('(prefers-reduced-motion: reduce)');
   let reduced=motion.matches,paused=false,w=0,h=0,scale=1,ox=0,oy=0;
   let now=0,previous=0,idle=0,frightenedUntil=0,pettedUntil=0,peekUntil=0,releasedAt=-10;
+  let keyboardPurrUntil=0;
   let active=null,keyboardHeld=false,selected='mug',focused=null,hover=null,strokeLean=0;
   const keys=new Set();
   const tray={x:0,y:0,tx:0,ty:0};
@@ -190,7 +191,7 @@
   function releaseCapture(id){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
   function finishGesture(cancelled=false){
     if(!active)return;
-    const gesture=active;active=null;releaseCapture(gesture.id);
+    const gesture=active;active=null;sound.purr(false);releaseCapture(gesture.id);
     if(gesture.kind==='mug'&&(gesture.dragged||gesture.wasSettling))landMug(cancelled);
     else if(gesture.kind==='pet'){
       if(!cancelled&&!gesture.stroked&&now-gesture.time<.3&&gesture.travel<12)frightenedUntil=now+1.5;
@@ -198,7 +199,7 @@
     }else if(!cancelled){peekUntil=now+.8;releasedAt=now;}
     hover=null;updateCursor();
   }
-  function cancel(){finishGesture(true);keys.clear();if(keyboardHeld)landMug(true);keyboardHeld=false;}
+  function cancel(){keyboardPurrUntil=0;sound.purr(false);finishGesture(true);keys.clear();if(keyboardHeld)landMug(true);keyboardHeld=false;}
   function reset(){cancel();tray.tx=0;tray.ty=0;mug.tx=0;mug.ty=0;mug.landing={seat:true};releasedAt=now;}
   function keyboard(e,kind=selected){
     if(e.code==='Space'){e.preventDefault();if(!e.repeat)togglePause();return;}
@@ -212,7 +213,7 @@
     }
     if(e.key==='Enter'&&!e.repeat){
       e.preventDefault();
-      if(kind==='pet'){if(e.shiftKey)frightenedUntil=now+1.5;else pettedUntil=now+2.8;}
+      if(kind==='pet'){if(e.shiftKey){keyboardPurrUntil=0;frightenedUntil=now+1.5;}else{pettedUntil=now+2.8;keyboardPurrUntil=performance.now()+450;}}
       else if(kind==='mug'){if(keyboardHeld)landMug();else{mug.seated=false;mug.landing=null;keyboardHeld=true;}}
       else peekUntil=now+1;
       idle=0;
@@ -234,8 +235,8 @@
     const a=active,dx=e.clientX-a.lastScreen.x,dy=e.clientY-a.lastScreen.y,delta=Math.hypot(dx,dy),dt=Math.max((e.timeStamp-a.stamp)/1000,.008),speed=delta/dt;
     a.travel+=delta;
     if(a.kind==='pet'){
-      if(speed>800&&delta>7){a.poked=true;frightenedUntil=now+1.5;}
-      else if(now-a.time>.14&&a.travel>8&&speed<500){a.stroked=true;pettedUntil=now+2.6;strokeLean=clamp(dx*.025,-.3,.3);}
+      if(speed>800&&delta>7){a.poked=true;a.purrUntil=0;frightenedUntil=now+1.5;}
+      else if(now-a.time>.14&&a.travel>8&&speed<500){a.stroked=true;a.purrUntil=performance.now()+140;pettedUntil=now+2.6;strokeLean=clamp(dx*.025,-.3,.3);}
     }else{
       if(!a.dragged&&Math.hypot(e.clientX-a.startScreen.x,e.clientY-a.startScreen.y)>6){a.dragged=true;if(a.kind==='mug'){mug.seated=false;mug.landing=null;}}
       if(a.dragged){
@@ -293,6 +294,8 @@
       if(Math.hypot(vx,vy)>650&&((active?.dragged&&active.kind!=='pet')||keyboardHeld))frightenedUntil=now+1.6;
       mug.tilt=mix(mug.tilt,reduced?0:clamp(-vx*.00015,-.045,.045),1-Math.exp(-dt*9));
       if(active?.kind==='pet'&&now-active.time>.38&&!active.stroked&&now>frightenedUntil){active.stroked=true;pettedUntil=now+2.6;}
+      const stroking=now>=frightenedUntil&&((active?.kind==='pet'&&!active.poked&&performance.now()<(active.purrUntil||0))||performance.now()<keyboardPurrUntil);
+      sound.purr(stroking);
       let expression,target;
       if(now<frightenedUntil){expression='startled';target=0;}
       else if(now<pettedUntil){expression='petted';target=.93;}

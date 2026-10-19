@@ -9,4 +9,4 @@ This is a new, independent personal project. Do not modify sibling Hobby project
 - Inspect actual rendered screenshots and interactions after visual or motion changes. Check deep retreat geometry, responsive portrait and landscape, pointer cancellation and pause behavior.
 - Do not create a remote repository, publish, post externally or change a portfolio without explicit authorization. Future repository changes must use pull requests.
 
-The playable experience has no build requirement. Runtime files are `index.html`, `style.css`, `app.js` and `audio.js`. Static Pages packaging copies only these files and a commit/hash manifest. Tests and review tools are development-only and must not become runtime dependencies.
+The playable experience has no build requirement. Runtime files are `index.html`, `style.css`, `app.js`, `audio.js` and the bundled `assets/purr.js` recording with `assets/PURR-LICENSE.txt`. Static Pages packaging copies only these files and a commit/hash manifest. Tests and review tools are development-only and must not become runtime dependencies.
