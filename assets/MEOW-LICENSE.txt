@@ -1,0 +1,27 @@
+The Sleepy Tenant: approved head-lift meow A
+
+Source: Cat Meow1.wav
+Author: steffcaffrey
+Freesound ID: 262312
+Source page: https://freesound.org/people/steffcaffrey/sounds/262312/
+License: CC0 1.0 Universal (public-domain dedication)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Original description: Male cat meow greeting. Zoom H4.
+Public HQ preview used: https://cdn.freesound.org/previews/262/262312_1844073-hq.mp3
+Source MP3 SHA-256:
+2e0210b8f7cacada5a8190d987a1dac2088c73db7baa8cd060624007392ec7c9
+
+Reviewed edit: A-greeting-meow.wav, selected by Dani on 2026-10-19.
+Duration: 14813 frames / 24000 Hz = 0.6172083333333334 seconds.
+Format: mono, 24 kHz, signed 16-bit little-endian PCM WAV.
+The complete short greeting is retained. Audition preparation removed DC,
+used fixed gain 0.02911647993663302 for RMS about 0.0035, and applied
+5 ms leading / 25 ms trailing fades. No pitch change or synthetic layer.
+This integration embeds that exact approved WAV with no further edit,
+normalization, EQ or processing. One-shot playback compensates for the
+existing .45 master gain so the settled level matches the quiet audition.
+Reviewed and embedded WAV SHA-256:
+f6bfa96d04fdf5ae94e24405ca4e54458eabe2fa2c1b3eb571f43d9f6758491b
+
+Bundled locally in meow.js; no network request or external service at runtime.
+Only candidate A is included. Candidate B remains an uninstalled audition.

@@ -135,7 +135,12 @@
     }
   }
   const descriptions={sleepy:'a small home. a very sleepy tenant.',curious:'a little look around',startled:'oh! back inside.',content:'there. all tucked in.',petted:'that is a very good spot.',peeking:'just checking on the world',nesting:'one more wriggle, then a little rest'};
-  function setExpression(value){if(value===state.expression)return;state.expression=value;mood.textContent=descriptions[value];announcement.textContent=descriptions[value];sound.react(value);}
+  function setExpression(value){
+    if(value===state.expression)return;
+    state.expression=value;mood.textContent=descriptions[value];announcement.textContent=descriptions[value];
+    // Only an idle peek with room for the head to rise gets its greeting.
+    sound.react(value,state.reveal<.84);
+  }
   function liftHeight(){return Math.min(34,26/scale);}
   function fit(kind,x,y){const b=limits[kind];return{x:clamp(x,b.minX,b.maxX),y:clamp(y,b.minY,b.maxY)};}
   function overlaps(x,y,tx=tray.tx,ty=tray.ty){return ((x-tx)/272)**2+((y-ty)/72)**2<1;}
