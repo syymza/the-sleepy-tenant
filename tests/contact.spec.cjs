@@ -22,7 +22,7 @@ test('saucer slides on the table, stops scraping at rest and has no release impa
  await observe(page);await parkMug(page);await page.mouse.up();await waitForPlacement(page);await clear(page);
  const parked=(await scene(page)).mug;
  for(const [dx,dy] of [[20,0],[0,-12]]){
-  await drag(page,await point(page,'tray',-150,151),dx,dy,20,30);
+  await drag(page,await point(page,'tray',-180,151),dx,dy,20,30);
   expect((await scene(page)).active.kind).toBe('tray');expect(await page.evaluate(()=>!!__sound.scrape)).toBe(true);
   await page.waitForTimeout(600);expect(await page.evaluate(()=>__sound.scrape)).toBe(null);await page.mouse.up();
   expect(await contacts(page)).toEqual([]);
