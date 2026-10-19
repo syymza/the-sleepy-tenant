@@ -1,0 +1,47 @@
+Sleepy Tenant contact-audio preview: natural Foley sources
+
+All three source pages declare Creative Commons Zero 1.0 (CC0).
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Source declarations checked on 2026-10-19. Courtesy credits retained below.
+The public high-quality MP3 preview was used for each source; no account-only
+original download or external runtime asset is required.
+
+1. Tea cup set down 2.mp3, TheHiraHira, 2019-02-21
+   Porcelain teacup placed on ceramic saucer.
+   https://freesound.org/people/TheHiraHira/sounds/460241/
+   https://cdn.freesound.org/previews/460/460241_9117851-hq.mp3
+   Edit: 1.898-2.558 seconds; mono 24 kHz; gentle high/low-pass, edge fades,
+   peak normalization before a quiet runtime gain. Used for ceramic contact.
+
+2. plate on table, ventousawins, 2023-03-30
+   Plate placed on wooden table.
+   https://freesound.org/people/ventousawins/sounds/681421/
+   https://cdn.freesound.org/previews/681/681421_14819331-hq.mp3
+   Edit: 3.065-3.405 seconds; mono 24 kHz; high-pass 80 Hz, low-pass 1850 Hz,
+   edge fades and peak normalization before a quiet runtime gain.
+   Used as the damped ceramic-to-table contact family. In this scene only
+   the mug lifts; the saucer remains table-supported, so it has no landing event.
+
+3. CERMFric_Ceramic Saucer Dragged On Wood Surface 01_Kospak,
+   bilginaslankospak, 2026-08-23
+   https://freesound.org/people/bilginaslankospak/sounds/867581/
+   https://cdn.freesound.org/previews/867/867581_3971939-hq.mp3
+   Edit: 2.750-3.570 seconds; mono 24 kHz; high-pass 150 Hz, low-pass 2600 Hz;
+   a 40 ms equal-power loop join, then quiet speed-dependent runtime gain.
+   Used only while the saucer actually moves across the tabletop.
+
+Bundled as PCM16 in foley.js; buffers are allocated only after Sound enable.
+No synthetic oscillator, white-noise layer, reverb or pitch sweep is added to
+these contact or scraping sounds. Existing creature cues are unchanged. The separately reviewed Pearl purr is
+documented in PURR-LICENSE.txt.
+The purr's separate public-domain provenance remains in PURR-LICENSE.txt.
+
+Downloaded public HQ MP3 SHA-256 values, in source order above:
+1. 5d4cd8798451548cf2429db91586edcdf103118a034b8bb47b5e3c29669e8bfa
+2. 8d10b78a477b89a2ab6135ce287476332d3fefcf79da2dfaecbc0b7ebbad0681
+3. 9aff5a396c0653891fa789f0bbba2dda3e20416af64804dd23a3d61eb87d5dd2
+
+Edited PCM16 SHA-256 values (without WAV header):
+ceramic: 7a3fa3fa3812435be1ff2e1b01dff9e4ebfafffa4ab3753d215f1af0994e75a4
+table: 94c66e7bae47cb6c03bc13c263267cc290ef9adca4ce81b22ce8e1183d9c9194
+scrape: 61f173b813ec98391f34c1397abfc1fb993ff9aa81380dc6eb6433f680eb7de0

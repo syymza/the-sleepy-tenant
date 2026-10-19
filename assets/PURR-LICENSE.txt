@@ -1,23 +1,30 @@
-The Sleepy Tenant: recorded cat purr
+The Sleepy Tenant: reviewed Pearl purr (audition B)
 
-Recording: Purring cat.oga, by Mysid (31 July 2007)
-Source: https://commons.wikimedia.org/wiki/File:Purring_cat.oga
-Original: https://upload.wikimedia.org/wikipedia/commons/d/db/Purring_cat.oga
-License: Public domain dedication by the copyright holder, worldwide.
-Where such dedication is not legally possible, the creator grants use for any
-purpose without conditions unless conditions are required by law.
-Verified against the source page's Licensing section on 19 October 2026.
+Recording: Female cat purr, Sadiquecat, 11 July 2023
+Subject: Pearl, resting on her side indoors in France; recorded 8 July 2023
+with a Zoom H5 stock capsule. The author reports approximately 15 dB gain.
+Source: https://freesound.org/people/Sadiquecat/sounds/695630/
+Public HQ MP3 preview used:
+https://cdn.freesound.org/previews/695/695630_5287430-hq.mp3
+License: Creative Commons Zero 1.0 Universal (CC0)
+https://creativecommons.org/publicdomain/zero/1.0/
+Source page and CC0 declaration verified on 19 October 2026.
+Courtesy credit: Female cat purr by Sadiquecat on Freesound.org.
 
-Original Ogg SHA-256:
-8e90102e81da15d0beb050317dab1b55fb6ad4d29abc91b0e0e7a72433bbcb7b
+Downloaded HQ MP3 SHA-256:
+580cbad6df089e608ea97d901767a34f6d4e14248aada40065f05763757e9f7c
 
-Edits for the user-approved preview: excerpt 1-7 seconds; mono 48 kHz PCM;
-fixed gain 0.025; 40 Hz high-pass and 1600 Hz low-pass filters;
-250 ms fade in and 350 ms fade out. No pitch change, added pulses or normalization.
-Approved WAV SHA-256:
-2a745db9f10b0b74316795b17c9d7290738256946f0d61f8e20011428fb48ecb
+Reviewed edit: B-Pearl-purr.wav, the single alternative purr in the delivered
+cat audition. Excerpt 18-22 seconds; mono 24 kHz PCM16; 35 Hz high-pass and
+2200 Hz low-pass; fixed attenuation to match the prior reference's average
+level; 55 ms boundary fades. No pitch change, pulse synthesis, gating or
+extra runtime normalization. This is the exact reviewed four-second WAV,
+not a new render or another passage from the source.
+Reviewed WAV SHA-256:
+72e267b067cf96f0a2d6a30f712def226b00ec91d318b54bbe7621b9e36f4bb3
 
-The exact approved WAV bytes are embedded losslessly in purr.js. Playback adds
-only gesture attack/release fades and repeats the six-second recording, whose
-existing end fades avoid clicks. No audio is fetched from external services.
-This recording is public domain and is separate from the project's MIT code.
+The WAV is embedded losslessly in purr.js for offline file:// playback.
+Gesture attack/release envelopes and the existing 0.45 bus compensation are
+retained. The recording repeats while a stroke continues; its reviewed edge
+fades are retained. No external audio is fetched. No head-lift trill or meow
+is included. The recording is CC0 and separate from the MIT project code.
