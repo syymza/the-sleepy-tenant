@@ -13,6 +13,7 @@ globalThis.SleepySound = class SleepySound {
     this.purrLoading = null;
     this.generation = 0;
     this.lastPeek = -Infinity;
+    this.headLowered = true;
     this.lastRustle = -Infinity;
     this.lastContact = -Infinity;
     this.contactVoice = null;
@@ -179,12 +180,20 @@ globalThis.SleepySound = class SleepySound {
     }
     this.meowBuffer=buffer;
   }
-  react(expression, headRising=false) {
+  headPose(reveal) {
+    // Follow the rendered pose even while muted. A missed rise is never queued.
+    // Separate thresholds prevent tiny movements from rearming the greeting.
+    if (reveal <= .78) this.headLowered=true;
+    if (!this.headLowered || reveal < .82) return;
+    this.headLowered=false;
+    if (!this.ready() || !this.meowBuffer || this.voices.size >= 2) return;
+    const t=this.context.currentTime;
+    if (t-this.lastPeek <= 8) return;
+    this.lastPeek=t;this.meow();
+  }
+  react(expression) {
     if (!this.ready() || this.voices.size >= 2) return;
     const t = this.context.currentTime;
-    if (expression === 'peeking' && headRising && t-this.lastPeek > 8) {
-      this.lastPeek = t;this.meow();
-    }
     if (expression === 'startled' && t-this.lastRustle > 1.5) {
       this.lastRustle = t;this.rustle();
     }

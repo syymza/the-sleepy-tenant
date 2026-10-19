@@ -3,12 +3,12 @@ class Param {constructor(){this.value=0;}setValueAtTime(v){this.value=v;}setTarg
 class Node {constructor(){this.gain=new Param();this.frequency=new Param();this.Q=new Param();}connect(){return this;}disconnect(){}start(){this.started=true;}stop(){this.stopped=true;}}
 class Context {constructor(){this.state='suspended';this.currentTime=0;this.sampleRate=48000;this.destination=new Node();this.listeners={};Context.count++;}decodeAudioData(){return Promise.resolve({duration:4});}createGain(){return this.lastGain=new Node();}createBuffer(_channels,length=48000,rate=48000){return{duration:length/rate,getChannelData:()=>new Float32Array(length)};}createBufferSource(){return new Node();}createOscillator(){return new Node();}createBiquadFilter(){return new Node();}addEventListener(n,f){this.listeners[n]=f;}resume(){this.state='running';return Promise.resolve();}}
 Context.count=0;globalThis.AudioContext=Context;
-test('off by default without allocating a context or voices',()=>{const n=Context.count,s=new SleepySound();s.motion(200);s.react('peeking',true);assert.equal(Context.count,n);assert.equal(s.context,null);assert.equal(s.voices.size,0);});
+test('off by default without allocating a context or voices',()=>{const n=Context.count,s=new SleepySound();s.motion(200);s.headPose(.83);assert.equal(Context.count,n);assert.equal(s.context,null);assert.equal(s.voices.size,0);});
 test('enable is silent and movement uses one bounded scrape source',async()=>{const s=new SleepySound();await s.enable();assert.equal(s.voices.size,0);assert.equal(s.scrape,null);s.motion(1000);const source=s.scrape.source;for(let i=0;i<100;i++)s.motion(1000);assert.equal(s.scrape.source,source);assert.ok(s.scrape.gain.gain.value<=.065);s.disable();assert.ok(source.stopped);assert.equal(s.scrape,null);});
-test('reactions have cooldowns, bounded polyphony and mute clears every voice',async()=>{const s=new SleepySound();await s.enable();s.react('peeking',true);s.react('peeking',true);assert.equal(s.voices.size,1);s.react('startled');for(let i=0;i<20;i++)s.react('startled');assert.equal(s.voices.size,2);s.disable();assert.equal(s.voices.size,0);s.react('peeking',true);assert.equal(s.voices.size,0);});
-test('pause stops all voices and prevents new sound until resumed',async()=>{const s=new SleepySound();await s.enable();s.motion(100);s.react('peeking',true);s.setBlocked(true);assert.equal(s.scrape,null);assert.equal(s.voices.size,0);s.motion(100);assert.equal(s.scrape,null);s.setBlocked(false);s.motion(100);assert.ok(s.scrape);s.disable();});
+test('reactions have cooldowns, bounded polyphony and mute clears every voice',async()=>{const s=new SleepySound();await s.enable();s.headPose(.83);s.headPose(.83);assert.equal(s.voices.size,1);s.react('startled');for(let i=0;i<20;i++)s.react('startled');assert.equal(s.voices.size,2);s.disable();assert.equal(s.voices.size,0);s.headPose(.83);assert.equal(s.voices.size,0);});
+test('pause stops all voices and prevents new sound until resumed',async()=>{const s=new SleepySound();await s.enable();s.motion(100);s.headPose(.83);s.setBlocked(true);assert.equal(s.scrape,null);assert.equal(s.voices.size,0);s.motion(100);assert.equal(s.scrape,null);s.setBlocked(false);s.motion(100);assert.ok(s.scrape);s.disable();});
 test('muting while a resume is pending cannot re-enable sound',async()=>{const s=new SleepySound();let resume;const original=Context.prototype.resume;Context.prototype.resume=function(){return new Promise(resolve=>{resume=()=>{this.state='running';resolve();};});};const pending=s.enable();s.disable();resume();await pending;assert.equal(s.enabled,false);assert.equal(s.master.gain.value,0);Context.prototype.resume=original;});
-test('suspension clears pending voices and muted gestures do not resume',async()=>{const s=new SleepySound();await s.enable();s.motion(100);s.react('peeking',true);s.context.state='suspended';s.context.listeners.statechange();assert.equal(s.voices.size,0);assert.equal(s.scrape,null);s.disable();s.unlock();assert.equal(s.context.state,'suspended');});
+test('suspension clears pending voices and muted gestures do not resume',async()=>{const s=new SleepySound();await s.enable();s.motion(100);s.headPose(.83);s.context.state='suspended';s.context.listeners.statechange();assert.equal(s.voices.size,0);assert.equal(s.scrape,null);s.disable();s.unlock();assert.equal(s.context.state,'suspended');});
 test('placement is silent while off and cooldown prevents contact chatter',async()=>{const s=new SleepySound();s.place();assert.equal(s.context,null);await s.enable();for(let i=0;i<20;i++)s.place();assert.equal(s.voices.size,1);s.disable();assert.equal(s.voices.size,0);});
 
 test('recorded purr is the approved WAV, lazy and bounded; release, mute and suspension stop it',async()=>{
@@ -34,7 +34,7 @@ function sessionSound(navigator,onResume=()=>{}) {
 }
 test('playback session is requested only by enable and before its synchronous resume',async()=>{
  const events=[],session={set type(value){events.push(value);}},s=sessionSound({audioSession:session},()=>events.push('resume'));
- s.unlock();s.motion(200);s.react('peeking',true);s.purr(true);s.setBlocked(true);s.setBlocked(false);
+ s.unlock();s.motion(200);s.headPose(.83);s.purr(true);s.setBlocked(true);s.setBlocked(false);
  assert.deepEqual(events,[]);assert.equal(s.context,null);
  const pending=s.enable();assert.deepEqual(events,['playback','resume']);assert.equal(await pending,true);
  assert.equal(s.voices.size,0);assert.equal(s.purring,null);s.disable();
@@ -61,21 +61,23 @@ test('head-lift meow is exact audition A, lazy, quiet and not normalized',async(
  assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),'f6bfa96d04fdf5ae94e24405ca4e54458eabe2fa2c1b3eb571f43d9f6758491b');
  assert.equal(SleepyMeowRecording.sourceId,'freesound:262312:reviewed-A');
  assert.equal(bytes.readUInt32LE(24),24000);assert.equal(bytes.readUInt16LE(22),1);assert.equal(bytes.readUInt16LE(34),16);
- const s=new SleepySound();assert.equal(s.meowBuffer,null);s.react('peeking',true);assert.equal(s.context,null);
- await s.enable();assert.equal(s.voices.size,0);assert.equal(s.meowBuffer.duration,14813/24000);
- s.react('peeking',true);assert.equal(s.voices.size,1);assert.equal(s.context.lastGain.gain.value,1/.45);
+ const s=new SleepySound();assert.equal(s.meowBuffer,null);s.headPose(.83);assert.equal(s.context,null);
+ await s.enable();assert.equal(s.voices.size,0);assert.equal(s.meowBuffer.duration,14813/24000);s.headPose(.72);
+ s.headPose(.83);assert.equal(s.voices.size,1);assert.equal(s.context.lastGain.gain.value,1/.45);
  let peak=0;for(let i=44;i<bytes.length;i+=2)peak=Math.max(peak,Math.abs(bytes.readInt16LE(i)/32768));
  assert.ok(peak>.01&&peak<.013);s.disable();
 });
-test('meow requires a rising idle peek, cannot chatter and is cleared by every stop path',async()=>{
+test('visible head rises rearm only after lowering, retain cooldown and never replay missed rises',async()=>{
  const s=new SleepySound();await s.enable();
- for(const expression of ['curious','content','petted','sleepy','nesting'])s.react(expression,true);
- s.react('peeking',false);assert.equal(s.voices.size,0);
- s.react('peeking',true);assert.equal(s.voices.size,1);for(let i=0;i<100;i++)s.react('peeking',true);assert.equal(s.voices.size,1);
- s.stop();s.context.currentTime=7.9;s.react('peeking',true);assert.equal(s.voices.size,0);
- s.context.currentTime=8.1;s.react('peeking',true);assert.equal(s.voices.size,1);s.setBlocked(true);assert.equal(s.voices.size,0);
- s.context.currentTime=17;s.react('peeking',true);assert.equal(s.voices.size,0);s.setBlocked(false);assert.equal(s.voices.size,0);
- s.react('peeking',true);assert.equal(s.voices.size,1);s.context.state='suspended';s.context.listeners.statechange();assert.equal(s.voices.size,0);
- s.context.state='running';s.context.currentTime=26;s.react('peeking',true);assert.equal(s.voices.size,1);s.disable();assert.equal(s.voices.size,0);
- s.context.currentTime=35;s.react('peeking',true);assert.equal(s.voices.size,0);
+ for(const expression of ['curious','content','petted','sleepy','nesting','peeking'])s.react(expression);
+ s.headPose(.81);assert.equal(s.voices.size,0);s.headPose(.83);assert.equal(s.voices.size,1);
+ for(let i=0;i<100;i++){s.headPose(.80);s.headPose(.95);}assert.equal(s.voices.size,1);
+ s.stop();s.context.currentTime=7.9;s.headPose(.72);s.headPose(.83);assert.equal(s.voices.size,0);
+ s.context.currentTime=8.1;s.headPose(.95);assert.equal(s.voices.size,0);
+ s.headPose(.72);s.headPose(.83);assert.equal(s.voices.size,1);s.setBlocked(true);assert.equal(s.voices.size,0);
+ s.context.currentTime=17;s.headPose(.72);s.headPose(.83);s.setBlocked(false);s.headPose(.95);assert.equal(s.voices.size,0);
+ s.headPose(.72);s.headPose(.83);assert.equal(s.voices.size,1);s.context.state='suspended';s.context.listeners.statechange();assert.equal(s.voices.size,0);
+ s.context.state='running';s.context.currentTime=26;s.headPose(.72);s.headPose(.83);assert.equal(s.voices.size,1);s.disable();assert.equal(s.voices.size,0);
+ s.context.currentTime=35;s.headPose(.72);s.headPose(.83);await s.enable();s.headPose(.95);assert.equal(s.voices.size,0);
+ s.headPose(.72);s.headPose(.83);assert.equal(s.voices.size,1);s.disable();
 });
