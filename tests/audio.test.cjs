@@ -24,3 +24,26 @@ test('muting during purr decode cannot enable sound or start a loop',async()=>{
  const original=Context.prototype.decodeAudioData;let finish;Context.prototype.decodeAudioData=function(){return new Promise(resolve=>{finish=resolve;});};
  const s=new SleepySound(),pending=s.enable();await Promise.resolve();s.disable();finish({duration:6});await pending;assert.equal(s.enabled,false);assert.equal(s.master.gain.value,0);assert.equal(s.purring,null);Context.prototype.decodeAudioData=original;
 });
+
+// Isolate navigator and context behavior without altering the host or other tests.
+function sessionSound(navigator,onResume=()=>{}) {
+ const sandbox={AudioContext:class extends Context {resume(){onResume();return super.resume();}},SleepyPurrRecording,atob,navigator};
+ require('node:vm').runInNewContext(require('node:fs').readFileSync(require.resolve('../audio.js'),'utf8'),sandbox);
+ return new sandbox.SleepySound();
+}
+test('playback session is requested only by enable and before its synchronous resume',async()=>{
+ const events=[],session={set type(value){events.push(value);}},s=sessionSound({audioSession:session},()=>events.push('resume'));
+ s.unlock();s.motion(200);s.react('peeking');s.purr(true);s.setBlocked(true);s.setBlocked(false);
+ assert.deepEqual(events,[]);assert.equal(s.context,null);
+ const pending=s.enable();assert.deepEqual(events,['playback','resume']);assert.equal(await pending,true);
+ assert.equal(s.voices.size,0);assert.equal(s.purring,null);s.disable();
+ s.unlock();assert.deepEqual(events,['playback','resume']);
+ assert.equal(await s.enable(),true);assert.deepEqual(events,['playback','resume','playback','resume']);s.disable();
+});
+test('missing navigator or audio session API leaves opt-in audio usable',async()=>{
+ for(const navigator of [undefined,{}]){const s=sessionSound(navigator);assert.equal(await s.enable(),true);assert.equal(s.context.state,'running');s.motion(100);assert.ok(s.scrape);s.disable();assert.equal(s.scrape,null);}
+});
+test('throwing audio session lookup or setter cannot fail sound enable',async()=>{
+ const lookup={get audioSession(){throw Error('Unavailable');}},setter={audioSession:{set type(_){throw Error('Restricted');}}};
+ for(const navigator of [lookup,setter]){const s=sessionSound(navigator);assert.equal(await s.enable(),true);s.purr(true);assert.ok(s.purring);s.setBlocked(true);assert.equal(s.purring,null);s.disable();assert.equal(s.enabled,false);}
+});

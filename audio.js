@@ -35,6 +35,11 @@ globalThis.SleepySound = class SleepySound {
           if (this.context === context && context.state !== 'running') this.stop();
         });
       }
+      // Explicit opt-in uses media playback routing, including iPhone silent mode.
+      // Unsupported or restricted session APIs must not prevent ordinary audio.
+      try {
+        if (globalThis.navigator?.audioSession) navigator.audioSession.type = 'playback';
+      } catch {}
       // Called synchronously from the button's activation, before the first await.
       await this.context.resume();
       if (attempt !== this.generation || !this.enabled) return false;

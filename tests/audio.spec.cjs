@@ -22,3 +22,21 @@ test('opt-in audio follows contact, remains bounded, mutes and resumes after int
  expect(await page.evaluate(()=>{const data=new Float32Array(__analyser.fftSize);__analyser.getFloatTimeDomainData(data);return Math.max(...data.map(Math.abs));})).toBeLessThan(.0001);
  await page.evaluate(()=>clearInterval(__meter));
 });
+
+test('explicit Sound enable selects playback routing when supported',async({page,isMobile})=>{
+ await openScene(page);
+ const session=()=>page.evaluate(()=>navigator.audioSession?.type??null);
+ const initial=await session();
+ await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','false');
+ await page.locator('[data-object="pet"]').focus();await page.keyboard.press('Enter');
+ expect(await session()).toBe(initial);
+ const enable=async()=>{
+  const button=page.getByRole('button',{name:'Enable sound',exact:true});
+  if(isMobile)await button.tap();else await button.click();
+  await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','true');
+  if(initial!==null)expect(await session()).toBe('playback');
+ };
+ await enable();await page.getByRole('button',{name:'Mute sound',exact:true}).click();
+ await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','false');await enable();
+ await page.getByRole('button',{name:'Mute sound',exact:true}).click();
+});
