@@ -2,7 +2,7 @@ const {test,expect}=require('@playwright/test');
 async function saucer(page,dx=0){return page.locator('canvas').evaluate((c,dx)=>{const r=c.getBoundingClientRect(),s=Math.min(r.width/510,r.height/450,1.35);return{x:r.x+r.width/2+dx*s,y:r.y+r.height*.5+130*s};},dx);}
 async function drag(page,p,dx,steps=18,delay=40){await page.mouse.move(p.x,p.y);await page.mouse.down();for(let i=1;i<=steps;i++){await page.mouse.move(p.x+dx*i/steps,p.y);await page.waitForTimeout(delay);}}
 test('gentle drag, release, fast retreat, recovery and contained geometry',async({page},testInfo)=>{
- const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await page.waitForTimeout(250);
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('./');await page.waitForTimeout(250);
  await drag(page,await saucer(page),28);await expect(page.locator('#mood')).toContainText('is that you');await page.waitForTimeout(700);
  await page.screenshot({path:testInfo.outputPath('curious.png')});await page.mouse.up();await expect(page.locator('#mood')).toContainText('good place');
  const p=await saucer(page,28/(await page.locator('canvas').evaluate(c=>Math.min(c.clientWidth/510,c.clientHeight/450,1.35))));
@@ -11,14 +11,14 @@ test('gentle drag, release, fast retreat, recovery and contained geometry',async
  await page.mouse.up();await expect(page.locator('#mood')).not.toContainText('slower',{timeout:5000});expect(errors).toEqual([]);
 });
 test('idle peeking and nesting remain timed and visually coherent',async({page},testInfo)=>{
- await page.clock.install();await page.goto('/');await page.clock.runFor(7500);await expect(page.locator('#mood')).toContainText('checking');await page.screenshot({path:testInfo.outputPath('peeking.png')});await page.clock.runFor(5700);await expect(page.locator('#mood')).toContainText('tuck');await page.screenshot({path:testInfo.outputPath('nesting.png')});
+ await page.clock.install();await page.goto('./');await page.clock.runFor(7500);await expect(page.locator('#mood')).toContainText('checking');await page.screenshot({path:testInfo.outputPath('peeking.png')});await page.clock.runFor(5700);await expect(page.locator('#mood')).toContainText('tuck');await page.screenshot({path:testInfo.outputPath('nesting.png')});
 });
 test('keyboard pause and reduced motion',async({page})=>{
- await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/');await page.waitForTimeout(300);const canvas=page.locator('canvas');const initial=await canvas.evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await canvas.evaluate(c=>c.toDataURL())).toBe(initial);
+ await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');await page.waitForTimeout(300);const canvas=page.locator('canvas');const initial=await canvas.evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await canvas.evaluate(c=>c.toDataURL())).toBe(initial);
  await canvas.focus();await page.keyboard.down('ArrowRight');await expect(page.locator('#mood')).toContainText('is that you');await page.keyboard.up('ArrowRight');await page.keyboard.press('Space');await expect(page.locator('#pause')).toHaveAttribute('aria-pressed','true');await page.waitForTimeout(50);const frozen=await canvas.evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await canvas.evaluate(c=>c.toDataURL())).toBe(frozen);await page.getByRole('button',{name:'Resume',exact:true}).click();await expect(page.locator('#pause')).toHaveAttribute('aria-pressed','false');await canvas.focus();await page.keyboard.press('Home');
 });
 test('responsive scene and controls fit all supported sizes without network dependencies',async({page},testInfo)=>{
- const external=[],origin=new URL(test.info().project.use.baseURL||process.env.BASE_URL||'http://127.0.0.1:4173').origin;page.on('request',r=>{if(!r.url().startsWith(origin))external.push(r.url());});await page.goto('/');
+ const external=[],origin=new URL(test.info().project.use.baseURL||process.env.BASE_URL||'http://127.0.0.1:4173').origin;page.on('request',r=>{if(!r.url().startsWith(origin))external.push(r.url());});await page.goto('./');
  for(const [name,width,height] of [['desktop',1440,1000],['portrait',390,844],['landscape',844,390],['small',320,568]]){await page.setViewportSize({width,height});await page.waitForTimeout(160);expect(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth&&document.documentElement.scrollHeight===innerHeight)).toBe(true);for(const id of ['sound','pause']){const r=await page.locator('#'+id).boundingBox();expect(r.x).toBeGreaterThanOrEqual(0);expect(r.y+r.height).toBeLessThanOrEqual(height);}await page.screenshot({path:testInfo.outputPath(name+'.png')});}expect(external).toEqual([]);
 });
 test('native touch drag, release and cancellation avoid page scrolling',async({browser,browserName})=>{
@@ -27,7 +27,7 @@ test('native touch drag, release and cancellation avoid page scrolling',async({b
 });
 test('real audio is opt-in, bounded, muteable and recovers from suspension',async({page,isMobile},testInfo)=>{
  await page.addInitScript(()=>{let value;Object.defineProperty(globalThis,'SleepySound',{configurable:true,get:()=>value,set:Base=>{value=class extends Base{constructor(...args){super(...args);globalThis.__sound=this;}};}});});
- await page.goto('/');await page.waitForTimeout(300);expect(await page.evaluate(()=>__sound.context)).toBe(null);await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','false');
+ await page.goto('./');await page.waitForTimeout(300);expect(await page.evaluate(()=>__sound.context)).toBe(null);await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','false');
  const activate=async()=>{if(isMobile)await page.getByRole('button',{name:'Enable sound',exact:true}).tap();else await page.getByRole('button',{name:'Enable sound',exact:true}).click();};await activate();await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','true');
  expect(await page.evaluate(()=>({state:__sound.context.state,voices:__sound.voices.size,scrape:__sound.scrape}))).toEqual({state:'running',voices:0,scrape:null});
  await page.evaluate(()=>{const c=__sound.context,a=c.createAnalyser(),zero=c.createGain();zero.gain.value=0;__sound.master.connect(a);a.connect(zero).connect(c.destination);globalThis.__analyser=a;globalThis.__peak=0;globalThis.__meter=setInterval(()=>{const data=new Float32Array(a.fftSize);a.getFloatTimeDomainData(data);for(const v of data)__peak=Math.max(__peak,Math.abs(v));},8);});
