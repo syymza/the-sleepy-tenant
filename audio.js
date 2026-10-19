@@ -17,6 +17,7 @@ globalThis.SleepySound = class SleepySound {
     this.lastContact = -Infinity;
     this.contactVoice = null;
     this.foley = null;
+    this.meowBuffer = null;
   }
   async enable() {
     const attempt = ++this.generation;
@@ -26,7 +27,7 @@ globalThis.SleepySound = class SleepySound {
         const Audio = globalThis.AudioContext || globalThis.webkitAudioContext;
         if (!Audio) throw new Error('Audio unavailable');
         this.context = new Audio({latencyHint:'interactive'});
-        this.purrBuffer = null;this.purrLoading = null;this.foley = null;
+        this.purrBuffer = null;this.purrLoading = null;this.foley = null;this.meowBuffer = null;
         this.master = this.context.createGain();
         this.master.gain.value = 0;
         this.master.connect(this.context.destination);
@@ -39,6 +40,7 @@ globalThis.SleepySound = class SleepySound {
         });
       }
       this.loadFoley();
+      this.loadMeow();
       // Explicit opt-in uses media playback routing, including iPhone silent mode.
       // Unsupported or restricted session APIs must not prevent ordinary audio.
       try {
@@ -166,11 +168,22 @@ globalThis.SleepySound = class SleepySound {
       if(t-this.scrape.quietSince>.08)this.stopScrape();
     } else this.scrape.quietSince=null;
   }
-  react(expression) {
+  loadMeow() {
+    if (this.meowBuffer) return;
+    const clip=SleepyMeowRecording,bytes=atob(clip.wavBase64);
+    const buffer=this.context.createBuffer(1,clip.frames,clip.sampleRate),data=buffer.getChannelData(0);
+    // The bundled reviewed WAV has a fixed 44-byte PCM header.
+    for(let i=0;i<data.length;i++){
+      const offset=clip.pcmOffset+i*2,value=bytes.charCodeAt(offset)|(bytes.charCodeAt(offset+1)<<8);
+      data[i]=(value&32768?value-65536:value)/32768;
+    }
+    this.meowBuffer=buffer;
+  }
+  react(expression, headRising=false) {
     if (!this.ready() || this.voices.size >= 2) return;
     const t = this.context.currentTime;
-    if (expression === 'peeking' && t-this.lastPeek > 8) {
-      this.lastPeek = t;this.murmur();
+    if (expression === 'peeking' && headRising && t-this.lastPeek > 8) {
+      this.lastPeek = t;this.meow();
     }
     if (expression === 'startled' && t-this.lastRustle > 1.5) {
       this.lastRustle = t;this.rustle();
@@ -201,15 +214,13 @@ globalThis.SleepySound = class SleepySound {
     this.voices.add(voice);source.onended=()=>voice.finish(false);
     source.start();source.stop(this.context.currentTime+duration);return voice;
   }
-  murmur() {
-    const t=this.context.currentTime, source=this.context.createOscillator();
-    source.type='sine';source.frequency.setValueAtTime(290,t);
-    source.frequency.exponentialRampToValueAtTime(225,t+.32);
-    const gain=this.context.createGain();gain.gain.setValueAtTime(0,t);
-    gain.gain.linearRampToValueAtTime(.044,t+.08);
-    gain.gain.exponentialRampToValueAtTime(.001,t+.38);
-    gain.gain.linearRampToValueAtTime(0,t+.43);
-    source.connect(gain).connect(this.master);this.voice(source,[source,gain],.45);
+  meow() {
+    const source=this.context.createBufferSource(),gain=this.context.createGain();
+    source.buffer=this.meowBuffer;
+    // Preserve the exact quiet audition level through the existing .45 bus.
+    gain.gain.value=1/.45;
+    source.connect(gain).connect(this.master);
+    this.voice(source,[source,gain],source.buffer.duration);
   }
   rustle() {
     const t=this.context.currentTime,source=this.context.createBufferSource();source.buffer=this.noise;
