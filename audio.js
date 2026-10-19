@@ -1,4 +1,4 @@
-/* Local synthesis only. No AudioContext or sound is created before opt-in. */
+/* Local sound only. The bundled public-domain purr decodes only after opt-in. */
 globalThis.SleepySound = class SleepySound {
   constructor(onChange = () => {}) {
     this.onChange = onChange;
@@ -8,6 +8,9 @@ globalThis.SleepySound = class SleepySound {
     this.master = null;
     this.voices = new Set();
     this.scrape = null;
+    this.purring = null;
+    this.purrBuffer = null;
+    this.purrLoading = null;
     this.generation = 0;
     this.lastPeek = -Infinity;
     this.lastRustle = -Infinity;
@@ -20,6 +23,7 @@ globalThis.SleepySound = class SleepySound {
         const Audio = globalThis.AudioContext || globalThis.webkitAudioContext;
         if (!Audio) throw new Error('Audio unavailable');
         this.context = new Audio({latencyHint:'interactive'});
+        this.purrBuffer = null;this.purrLoading = null;
         this.master = this.context.createGain();
         this.master.gain.value = 0;
         this.master.connect(this.context.destination);
@@ -35,6 +39,8 @@ globalThis.SleepySound = class SleepySound {
       await this.context.resume();
       if (attempt !== this.generation || !this.enabled) return false;
       if (this.context.state !== 'running') throw new Error('Audio interrupted');
+      await this.loadPurr();
+      if (attempt !== this.generation || !this.enabled) return false;
       this.level();
       this.onChange(true);
       return true;
@@ -88,7 +94,41 @@ globalThis.SleepySound = class SleepySound {
       this.scrape.nodes.forEach(n => n.disconnect());
       this.scrape = null;
     }
+    this.stopPurr();
     for (const voice of [...this.voices]) voice.finish(true);
+  }
+  loadPurr() {
+    if (this.purrBuffer) return Promise.resolve();
+    if (!this.purrLoading) {
+      const context=this.context;
+      const bytes=Uint8Array.from(atob(SleepyPurrRecording.wavBase64),c=>c.charCodeAt(0));
+      this.purrLoading=context.decodeAudioData(bytes.buffer).then(buffer=>{
+        if (this.context===context) this.purrBuffer=buffer;
+      });
+    }
+    return this.purrLoading;
+  }
+  stopPurr() {
+    if (!this.purring) return;
+    try { this.purring.source.stop(); } catch {}
+    this.purring.nodes.forEach(node=>node.disconnect());
+    this.purring=null;
+  }
+  purr(stroking) {
+    if (!this.ready() || !this.purrBuffer) { this.stopPurr(); return; }
+    const t=this.context.currentTime;
+    if (stroking && !this.purring) {
+      const source=this.context.createBufferSource(),gain=this.context.createGain();
+      source.buffer=this.purrBuffer;source.loop=true;gain.gain.value=0;
+      source.connect(gain).connect(this.master);source.start();
+      this.purring={source,gain,nodes:[source,gain],quietSince:null};
+    }
+    const voice=this.purring;if (!voice) return;
+    // The approved WAV is already quiet. Undo the synth bus's .45 attenuation
+    // so its settled level matches that preview, without normalization.
+    voice.gain.gain.setTargetAtTime(stroking?1/.45:0,t,stroking?.18:.09);
+    if (stroking) voice.quietSince=null;
+    else {voice.quietSince??=t;if(t-voice.quietSince>.45)this.stopPurr();}
   }
   motion(speed) {
     if (!this.ready()) return;
