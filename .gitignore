@@ -1,0 +1,16 @@
+node_modules/
+_site/
+review/
+test-results/
+playwright-report/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+# Local recording and QA helpers are kept outside the public source.
+tools/encode.swift
+tools/record.cjs
+tools/poses.cjs
+tools/verify.cjs
+tools/verify-file.cjs
