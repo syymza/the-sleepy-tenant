@@ -1,6 +1,6 @@
 # The Sleepy Tenant
 
-A tiny creature lives in an oversized ceramic cup. Gently drag its saucer and it peeks out. Move too quickly and it retreats. Leave it alone and it checks on the world or tucks its quilt.
+A tiny creature lives in an oversized ceramic cup. Gently drag its saucer and it peeks out. Move too quickly and it retreats. Leave it alone and it checks on the world or settles into its cup.
 
 [Play The Sleepy Tenant](https://syymza.github.io/the-sleepy-tenant/)
 

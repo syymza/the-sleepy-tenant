@@ -39,7 +39,7 @@
   function grain(p,alpha=.18){ctx.save();if(p)ctx.clip(p);ctx.globalAlpha=alpha;ctx.fillStyle=texture;ctx.fillRect(-300,-350,600,650);ctx.restore();}
   function shadow(x,y,rx,ry,opacity){ctx.save();ctx.translate(x,y);ctx.scale(1,ry/rx);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,`rgba(65,51,33,${opacity})`);g.addColorStop(1,'rgba(65,51,33,0)');ellipse(0,0,rx,rx,g);ctx.restore();}
   const hitCtx=document.createElement('canvas').getContext('2d');
-  const mugHandle=new Path2D('M105 -22 C181 -45 199 42 165 90 C151 110 132 116 111 106 L104 84 C147 104 165 59 157 24 C151 2 136 -5 109 9 Z');
+  const mugHandle=new Path2D('M104 -24 C154 -40 188 -7 187 39 C186 86 156 119 116 110 C100 110 86 102 88 92 C90 84 101 80 114 84 C148 90 164 66 164 39 C165 12 148 -5 111 -1 C100 1 96 -19 104 -24 Z');
   const mugBody=new Path2D('M-116 -22 C-113 24 -112 102 -84 132 C-55 160 55 160 84 132 C112 102 113 24 116 -22');
   mugBody.ellipse(0,-22,116,36,0,0,Math.PI);mugBody.closePath();
   function saucer(){
@@ -49,37 +49,27 @@
     ctx.save();ctx.beginPath();ctx.ellipse(0,150,187,44,0,0,Math.PI*2);ctx.clip();grain(null,.35);ctx.restore();
     ctx.beginPath();ctx.ellipse(0,148,176,38,0,.12,Math.PI-.12);ctx.strokeStyle='#e2e1cb';ctx.lineWidth=2;ctx.stroke();
     ellipse(0,150,127,27,'#aeb69a');ellipse(0,148,125,25,'#c1c5aa');
-
-    // A little fallen sprig, painted with the same restrained material palette.
-    ctx.save();ctx.translate(-143,151);ctx.rotate(-.28);
-    path('M-13 4 Q1 -2 24 -4',null,'#858b68',1.5);
-    path('M0 0 Q-16 -18 -22 -9 Q-17 3 0 0','#8b9776');
-    path('M8 -2 Q13 -17 24 -12 Q24 -3 8 -2','#a0a783');ctx.restore();
   }
   function cupBack(t){
     // The handle has real negative space instead of a painted-on inner patch.
     const handle=mugHandle;
     ctx.save();ctx.shadowColor='#79604c35';ctx.shadowBlur=5;ctx.shadowOffsetY=4;
     ctx.fillStyle=gradient(100,-20,180,95,[[0,'#c9a78b'],[.4,'#b88b70'],[1,'#8e6554']]);ctx.fill(handle);ctx.restore();grain(handle,.7);
-    path('M125 -14 C170 -17 181 68 135 96',null,'#d7b89a',2.4);
+    path('M126 -17 C165 -12 180 57 142 96',null,'#d7b89a70',1.5);
     ellipse(0,-22,116,36,gradient(0,-55,0,13,[[0,'#d6b49a'],[1,'#b58b70']]));
     ellipse(0,-24,104,27,gradient(0,-50,0,10,[[0,'#604a3e'],[.55,'#8a6b54'],[1,'#b69272']]));
-    // A folded moss-green quilt in the far side of the little home.
-    ctx.save();ctx.translate(state.expression==='nesting'&&!reduced?Math.sin(t*3)*2.5:0,0);
-    path('M-86 -14 Q-74 -36 -49 -25 Q-33 -18 -17 -19 L-18 2 L-86 2 Z','#939a77');
-    path('M-78 -15 Q-55 -24 -28 -11',null,'#b2b394',2);
-    ctx.restore();
   }
   function pose(t){
     const breathe=reduced?0:Math.sin(t*1.7)*.7;
     const grip=clamp((state.reveal-.69)/.26,0,1);
-    return {x:state.lean*10,y:mix(60,-43,state.reveal)+breathe,
+    return {x:state.lean*13,y:mix(60,-43,state.reveal)+breathe,
       angle:reduced?0:state.lean*.08,grip:grip*grip*(3-2*grip)};
   }
   function hand(sign,p){
-    const x=sign*46+state.lean*3;
-    const lip=-23+31*Math.sqrt(1-(x/110)**2);
-    return {x,y:lip+(1-p.grip)*20,lip};
+    const x=sign*48+state.lean*2;
+    const inner=-24+27*Math.sqrt(1-(x/104)**2);
+    const outer=-22+36*Math.sqrt(1-(x/116)**2);
+    return {x,y:inner-4+(1-p.grip)*24,lip:outer-3,inner};
   }
   function creature(t){
     const p=pose(t),lean=state.lean;
@@ -88,9 +78,8 @@
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);ellipse(0,29,39,33,fur);ctx.restore();
     for(const sign of [-1,1]){
       const h=hand(sign,p),sx=p.x+sign*35*Math.cos(p.angle)-27*Math.sin(p.angle),sy=p.y+sign*35*Math.sin(p.angle)+27*Math.cos(p.angle);
-      const arm=new Path2D();arm.moveTo(sx,sy);arm.bezierCurveTo(sx+sign*13,sy+8,h.x,h.y-14,h.x,h.y-3);
-      ctx.strokeStyle=fur;ctx.lineWidth=16;ctx.lineCap='round';ctx.stroke(arm);
-      ellipse(h.x,h.y-4,11,10,fur);
+      const arm=new Path2D();arm.moveTo(sx,sy);arm.bezierCurveTo(sx+sign*5,sy+6,h.x,h.y-5,h.x,h.y+2);
+      ctx.strokeStyle=fur;ctx.lineWidth=13;ctx.lineCap='round';ctx.stroke(arm);
     }
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
     const ears=path('M-40 -24 C-59 -38 -69 -73 -52 -78 C-36 -82 -22 -51 -26 -29 Z M25 -29 C21 -54 38 -84 52 -78 C69 -70 56 -39 40 -24 Z',fur);
@@ -132,18 +121,20 @@
     path('M-5 121 Q0 116 5 121 M0 117 L0 126',null,'#a57e6360',1.3);
   }
   function paws(t){
-    const p=pose(t),curl=clamp((p.grip-.6)/.4,0,1);
-    if(!curl)return;
+    const p=pose(t),grip=clamp((p.grip-.5)/.5,0,1);
+    if(!grip)return;
     for(const sign of [-1,1]){
       const h=hand(sign,p);ctx.save();ctx.translate(h.x,h.lip);
-      shadow(0,4,13,4,.17*curl);
-      const fingers=path(`M-10 -2 Q0 ${-2-6*curl} 10 -2 C12 ${-2+11*curl} 6 ${-2+15*curl} 0 ${-2+15*curl} C-7 ${-2+15*curl} -12 ${-2+11*curl} -10 -2 Z`,gradient(-10,-7,9,16,[[0,'#f0e2c2'],[.55,'#e0ccaa'],[1,'#bfa27d']]));
-      grain(fingers,.18);
-      if(curl>.3)path(`M-3 4 L-3 ${4+4*curl} M3 4 L3 ${4+4*curl}`,null,'#b49a7766',.85);
+      shadow(0,8,12,3,.16*grip);
+      // Rounded knuckles bridge the rim; the fingers curl over its front edge.
+      const top=(h.inner-h.lip-1)*grip;ctx.globalAlpha=grip;
+      const paw=path(`M-9 -1 C-10 ${top} -5 ${top-1} 0 ${top-1} C6 ${top-1} 10 ${top+1} 10 0 L10 ${4*grip} C10 ${8*grip} -9 ${8*grip} -9 ${3*grip} Z`,gradient(-8,top,8,12,[[0,'#f2e5c7'],[.55,'#e6d4b0'],[1,'#c9b18b']]));
+      grain(paw,.2);
+      if(grip>.35)path(`M-3 3 Q-4 5 -3 ${6*grip} M3 3 Q4 5 3 ${6*grip}`,null,'#b59d7966',.8);
       ctx.restore();
     }
   }
-  const descriptions={sleepy:'a small home. a very sleepy tenant.',curious:'a little look around',startled:'oh! back under the quilt.',content:'there. all tucked in.',petted:'that is a very good spot.',peeking:'just checking on the world',nesting:'one more tuck, then a little rest'};
+  const descriptions={sleepy:'a small home. a very sleepy tenant.',curious:'a little look around',startled:'oh! back inside.',content:'there. all tucked in.',petted:'that is a very good spot.',peeking:'just checking on the world',nesting:'one more wriggle, then a little rest'};
   function setExpression(value){if(value===state.expression)return;state.expression=value;mood.textContent=descriptions[value];announcement.textContent=descriptions[value];sound.react(value);}
   function liftHeight(){return Math.min(34,26/scale);}
   function fit(kind,x,y){const b=limits[kind];return{x:clamp(x,b.minX,b.maxX),y:clamp(y,b.minY,b.maxY)};}
@@ -238,7 +229,7 @@
       if(speed>800&&delta>7){a.poked=true;a.purrUntil=0;frightenedUntil=now+1.5;}
       else if(now-a.time>.14&&a.travel>8&&speed<500){a.stroked=true;a.purrUntil=performance.now()+140;pettedUntil=now+2.6;strokeLean=clamp(dx*.025,-.3,.3);}
     }else{
-      if(!a.dragged&&Math.hypot(e.clientX-a.startScreen.x,e.clientY-a.startScreen.y)>6){a.dragged=true;if(a.kind==='mug'){mug.seated=false;mug.landing=null;}}
+      if(!a.dragged&&Math.hypot(e.clientX-a.startScreen.x,e.clientY-a.startScreen.y)>5){a.dragged=true;if(a.kind==='mug'){mug.seated=false;mug.landing=null;}}
       if(a.dragged){
         const x=a.startObject.x+p.x-a.start.x,y=a.startObject.y+p.y-a.start.y;
         if(a.kind==='mug'){const target=fit('mug',x,y);mug.tx=target.x;mug.ty=target.y;}
@@ -291,7 +282,7 @@
       if(mug.landing&&Math.hypot(mug.tx-mug.x,mug.ty-mug.y)<.6&&mug.lift<.3){mug.x=mug.tx;mug.y=mug.ty;mug.lift=0;mug.seated=mug.landing.seat;mug.landing=null;releasedAt=now;sound.place?.();}
       const vx=(mug.x-oldCupX)/dt,vy=(mug.y-oldCupY)/dt,traySpeed=Math.hypot(tray.x-oldTrayX,tray.y-oldTrayY)/dt;
       sound.motion(Math.max(traySpeed,mug.lift<1&&!mug.seated?Math.hypot(vx,vy):0));
-      if(Math.hypot(vx,vy)>650&&((active?.dragged&&active.kind!=='pet')||keyboardHeld))frightenedUntil=now+1.6;
+      if(Math.hypot(vx,vy)>480&&((active?.dragged&&active.kind!=='pet')||keyboardHeld))frightenedUntil=now+1.6;
       mug.tilt=mix(mug.tilt,reduced?0:clamp(-vx*.00015,-.045,.045),1-Math.exp(-dt*9));
       if(active?.kind==='pet'&&now-active.time>.38&&!active.stroked&&now>frightenedUntil){active.stroked=true;pettedUntil=now+2.6;}
       const stroking=now>=frightenedUntil&&((active?.kind==='pet'&&!active.poked&&performance.now()<(active.purrUntil||0))||performance.now()<keyboardPurrUntil);
@@ -304,10 +295,10 @@
       else if(idle%20>12&&idle%20<16){expression='nesting';target=.34;}
       else if(idle%20>6){expression='peeking';target=.88;}
       else{expression='sleepy';target=.72;}
-      setExpression(expression);state.reveal=mix(state.reveal,target,1-Math.exp(-dt*(expression==='startled'?15:3.5)));
+      setExpression(expression);state.reveal=mix(state.reveal,target,1-Math.exp(-dt*(expression==='startled'?19:3.5)));
       strokeLean*=Math.exp(-dt*.8);
       const nest=expression==='nesting'&&!reduced?Math.sin(now*3)*.18:0;
-      state.lean=mix(state.lean,clamp(-vx/340+(expression==='petted'?strokeLean:0)+nest,-.7,.7),1-Math.exp(-dt*8));
+      state.lean=mix(state.lean,clamp(-vx/220+(expression==='petted'?strokeLean:0)+nest,-.7,.7),1-Math.exp(-dt*11));
       for(const control of objectControls)control.setAttribute('aria-pressed',String(control.dataset.object==='mug'&&keyboardHeld));
     }
     draw(now);requestAnimationFrame(animate);

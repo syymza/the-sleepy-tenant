@@ -54,6 +54,6 @@ test('keyboard object controls, pause, reset and reduced motion remain usable',a
  await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.waitForTimeout(250);const still=await page.locator('canvas').evaluate(c=>c.toDataURL());await page.waitForTimeout(250);expect(await page.locator('canvas').evaluate(c=>c.toDataURL())).toBe(still);
 });
 
-test('idle peeking and quilt adjustment retain their timing',async({page},info)=>{
+test('idle peeking and settling retain their timing',async({page},info)=>{
  await page.clock.install();await openScene(page);await page.clock.runFor(7500);await expect.poll(async()=>(await scene(page)).pet.expression).toBe('peeking');await capture(page,info,'idle-peeking');await page.clock.runFor(5700);await expect.poll(async()=>(await scene(page)).pet.expression).toBe('nesting');await capture(page,info,'idle-nesting');
 });
