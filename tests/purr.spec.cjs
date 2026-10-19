@@ -13,7 +13,9 @@ test('approved recorded purr follows gentle strokes and all stop conditions',asy
  await page.addInitScript(()=>{let C;Object.defineProperty(window,'SleepySound',{configurable:true,get:()=>C,set:Base=>C=class extends Base{constructor(...a){super(...a);window.__sound=this;}}});window.addEventListener('pointerdown',e=>window.__pointerId=e.pointerId,true);});
  await openScene(page);await stroke(page,400);expect(await page.evaluate(()=>__sound.context)).toBe(null);await page.mouse.up();
  const enable=async()=>{const b=page.getByRole('button',{name:'Enable sound',exact:true});if(isMobile)await b.tap();else await b.click();await expect(page.locator('#sound')).toHaveAttribute('aria-pressed','true');};
- await enable();expect(await page.evaluate(()=>({duration:__sound.purrBuffer.duration,purr:__sound.purring}))).toEqual({duration:4,purr:null});
+ await enable();const decoded=await page.evaluate(()=>({frames:__sound.purrBuffer.length,rate:__sound.purrBuffer.sampleRate,purr:__sound.purring}));
+ // Resampling 24 kHz to the output device rate can round by one output frame.
+ expect(Math.abs(decoded.frames-4*decoded.rate)).toBeLessThanOrEqual(1);expect(decoded.purr).toBe(null);
  await page.evaluate(()=>{const c=__sound.context,a=c.createAnalyser(),zero=c.createGain();zero.gain.value=0;__sound.master.connect(a);a.connect(zero).connect(c.destination);window.__analyser=a;window.__peak=0;window.__meter=setInterval(()=>{const d=new Float32Array(a.fftSize);a.getFloatTimeDomainData(d);for(const v of d)__peak=Math.max(__peak,Math.abs(v));},8);});
  await stroke(page,1800);expect(await page.evaluate(()=>!!__sound.purring)).toBe(true);expect((await scene(page)).pet.expression).toBe('petted');
  await page.screenshot({path:info.outputPath('recorded-purr-stroke.png')});await quiet(page);await page.mouse.up();
