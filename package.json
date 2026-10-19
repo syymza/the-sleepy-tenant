@@ -1,0 +1,14 @@
+{
+  "name": "the-sleepy-tenant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tiny creature, a ceramic cup, and a quiet moment to play.",
+  "scripts": {
+    "start": "node tools/serve.cjs",
+    "check": "node --check app.js && node --check audio.js && node --check tools/build.cjs && node --test tests/audio.test.cjs",
+    "test": "playwright test",
+    "build": "node tools/build.cjs"
+  },
+  "engines": {"node": ">=22"},
+  "devDependencies": {"@playwright/test": "1.62.1"}
+}
