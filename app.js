@@ -138,8 +138,7 @@
   function setExpression(value){
     if(value===state.expression)return;
     state.expression=value;mood.textContent=descriptions[value];announcement.textContent=descriptions[value];
-    // Only an idle peek with room for the head to rise gets its greeting.
-    sound.react(value,state.reveal<.84);
+    sound.react(value);
   }
   function liftHeight(){return Math.min(34,26/scale);}
   function fit(kind,x,y){const b=limits[kind];return{x:clamp(x,b.minX,b.maxX),y:clamp(y,b.minY,b.maxY)};}
@@ -319,6 +318,7 @@
       else if(idle%20>6){expression='peeking';target=.88;}
       else{expression='sleepy';target=.72;}
       setExpression(expression);state.reveal=mix(state.reveal,target,1-Math.exp(-dt*(expression==='startled'?19:3.5)));
+      sound.headPose(state.reveal);
       strokeLean*=Math.exp(-dt*.8);
       const nest=expression==='nesting'&&!reduced?Math.sin(now*3)*.18:0;
       state.lean=mix(state.lean,clamp(-vx/220+(expression==='petted'?strokeLean:0)+nest,-.7,.7),1-Math.exp(-dt*11));
