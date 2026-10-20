@@ -334,12 +334,18 @@
     ctx.restore();
   }
   function drawTray(){ctx.save();ctx.translate(tray.x,tray.y);saucer();if((active?.kind==='mug'&&active.dragged)||keyboardHeld){if(overlaps(mug.tx,mug.ty)){ctx.beginPath();ctx.ellipse(0,148,91,18,0,0,Math.PI*2);ctx.strokeStyle='#e6e2caaa';ctx.lineWidth=2;ctx.stroke();}}focusOutline('tray');ctx.restore();}
+  function highlightRim(start,end){
+    if(hover!=='mug'||active)return;
+    // Each half belongs to its ceramic layer, behind the tenant and its paws.
+    ctx.beginPath();ctx.ellipse(0,-22,116,36,0,start,end);ctx.strokeStyle='#f4dcc170';ctx.lineWidth=1;ctx.stroke();
+  }
   function drawMug(t){
     const spread=mug.lift*.55;shadow(mug.x,mug.y+153,110+spread,19+mug.lift*.12,.23/(1+mug.lift*.025));
     shadow(mug.x,mug.y+153,82,7,.25*Math.max(0,1-mug.lift/10));
     ctx.save();ctx.translate(mug.x,mug.y-mug.lift+153);ctx.rotate(mug.tilt);ctx.translate(0,-153);
-    cupBack(t);ctx.save();ctx.clip(new Path2D('M-103 -250 L103 -250 L103 -24 C103 12 -103 12 -103 -24 Z'));creature(t);ctx.restore();cupFront();paws(t);focusOutline('mug');focusOutline('pet');
-    if(hover==='mug'&&!active){ctx.beginPath();ctx.ellipse(0,-22,116,36,0,0,Math.PI*2);ctx.strokeStyle='#f4dcc170';ctx.lineWidth=1;ctx.stroke();}
+    cupBack(t);highlightRim(Math.PI,Math.PI*2);
+    ctx.save();ctx.clip(new Path2D('M-103 -250 L103 -250 L103 -24 C103 12 -103 12 -103 -24 Z'));creature(t);ctx.restore();
+    cupFront();highlightRim(0,Math.PI);paws(t);focusOutline('mug');focusOutline('pet');
     ctx.restore();
   }
   function draw(t){
